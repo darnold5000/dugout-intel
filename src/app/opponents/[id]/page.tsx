@@ -2,19 +2,15 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExtractionStatusBadge } from "@/components/ExtractionStatusBadge";
-import {
-  ArrowLeft,
-  Upload,
-  Database,
-  FileText,
-  MapPin,
-} from "lucide-react";
+import { OpponentWorkspace } from "@/components/opponent/OpponentWorkspace";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { ArrowLeft, MapPin } from "lucide-react";
+import type { OpponentDetail } from "@/types";
 
 export default async function OpponentDetailPage({
   params,
@@ -37,45 +33,38 @@ export default async function OpponentDetailPage({
   if (!opponent) notFound();
 
   const [
-    { data: uploads },
-    { data: players },
-    { data: battingStats },
-    { data: pitchingStats },
-    { data: reports },
+    { data: screenshot_uploads },
+    { data: extracted_players },
+    { data: extracted_batting_stats },
+    { data: extracted_pitching_stats },
+    { data: extracted_games },
+    { data: scouting_reports },
   ] = await Promise.all([
     supabase
       .from("screenshot_uploads")
       .select("*")
       .eq("opponent_id", id)
       .order("created_at", { ascending: false }),
-    supabase
-      .from("extracted_players")
-      .select("id")
-      .eq("opponent_id", id),
-    supabase
-      .from("extracted_batting_stats")
-      .select("id")
-      .eq("opponent_id", id),
-    supabase
-      .from("extracted_pitching_stats")
-      .select("id")
-      .eq("opponent_id", id),
+    supabase.from("extracted_players").select("*").eq("opponent_id", id),
+    supabase.from("extracted_batting_stats").select("*").eq("opponent_id", id),
+    supabase.from("extracted_pitching_stats").select("*").eq("opponent_id", id),
+    supabase.from("extracted_games").select("*").eq("opponent_id", id),
     supabase
       .from("scouting_reports")
       .select("*")
       .eq("opponent_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1),
+      .order("created_at", { ascending: false }),
   ]);
 
-  const pendingCount =
-    uploads?.filter((u) => u.extraction_status === "pending").length ?? 0;
-  const hasExtractedData =
-    (players?.length ?? 0) +
-      (battingStats?.length ?? 0) +
-      (pitchingStats?.length ?? 0) >
-    0;
-  const latestReport = reports?.[0];
+  const detail: OpponentDetail = {
+    ...opponent,
+    screenshot_uploads: screenshot_uploads ?? [],
+    extracted_players: extracted_players ?? [],
+    extracted_batting_stats: extracted_batting_stats ?? [],
+    extracted_pitching_stats: extracted_pitching_stats ?? [],
+    extracted_games: extracted_games ?? [],
+    scouting_reports: scouting_reports ?? [],
+  };
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -88,121 +77,25 @@ export default async function OpponentDetailPage({
           </Link>
         </Button>
 
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{opponent.name}</h1>
-              <Badge variant="secondary">{opponent.age_level}</Badge>
-            </div>
-            {opponent.location && (
-              <p className="text-muted-foreground mt-1 flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                {opponent.location}
-              </p>
-            )}
-            {opponent.notes && (
-              <p className="text-sm text-muted-foreground mt-2">
-                {opponent.notes}
-              </p>
-            )}
+        <div className="mb-8">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">{opponent.name}</h1>
+            <Badge variant="secondary">{opponent.age_level}</Badge>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Screenshots
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{uploads?.length ?? 0}</p>
-              {pendingCount > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {pendingCount} pending extraction
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Extracted data
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">
-                {(players?.length ?? 0) +
-                  (battingStats?.length ?? 0) +
-                  (pitchingStats?.length ?? 0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">records</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Report
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">
-                {latestReport ? "Ready" : "—"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex flex-wrap gap-3 mb-8">
-          <Button asChild>
-            <Link href={`/opponents/${id}/upload`}>
-              <Upload className="h-4 w-4 mr-1" />
-              Upload screenshots
-            </Link>
-          </Button>
-          {hasExtractedData && (
-            <Button variant="outline" asChild>
-              <Link href={`/opponents/${id}/extracted-data`}>
-                <Database className="h-4 w-4 mr-1" />
-                Review data
-              </Link>
-            </Button>
+          {opponent.location && (
+            <p className="text-muted-foreground mt-1 flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {opponent.location}
+            </p>
           )}
-          {hasExtractedData && (
-            <Button variant="outline" asChild>
-              <Link href={`/opponents/${id}/report`}>
-                <FileText className="h-4 w-4 mr-1" />
-                {latestReport ? "View report" : "Generate report"}
-              </Link>
-            </Button>
+          {opponent.notes && (
+            <p className="text-sm text-muted-foreground mt-2">{opponent.notes}</p>
           )}
         </div>
 
-        {uploads && uploads.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recent uploads</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {uploads.slice(0, 5).map((upload) => (
-                  <div
-                    key={upload.id}
-                    className="flex items-center justify-between text-sm py-2 border-b last:border-0"
-                  >
-                    <span className="text-muted-foreground truncate max-w-[200px]">
-                      {upload.screenshot_type?.replace("_", " ") ?? "Unknown type"}
-                    </span>
-                    <ExtractionStatusBadge status={upload.extraction_status} />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Suspense fallback={<LoadingSpinner label="Loading workspace..." />}>
+          <OpponentWorkspace opponentId={id} initialData={detail} />
+        </Suspense>
       </main>
     </div>
   );

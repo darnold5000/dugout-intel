@@ -34,6 +34,7 @@ CREATE TABLE screenshot_uploads (
   file_path TEXT NOT NULL,
   screenshot_type TEXT CHECK (screenshot_type IN ('roster', 'schedule', 'box_score', 'batting_stats', 'pitching_stats', 'game_summary', 'unknown')),
   extraction_status TEXT NOT NULL DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'complete', 'failed')),
+  extraction_error TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -112,6 +113,8 @@ CREATE TABLE scouting_reports (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   opponent_id UUID NOT NULL REFERENCES opponents(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT,
+  share_token TEXT UNIQUE,
   report_json JSONB NOT NULL DEFAULT '{}',
   report_text TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

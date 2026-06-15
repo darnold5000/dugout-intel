@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next.js build output (rebuilt inside the image)
+.next
+out
+build
+
+# Git
+.git
+.gitignore
+
+# Local env files (secrets injected at build/deploy time)
+.env
+.env.*
+!.env.local.example
+
+# Editor / OS
+.DS_Store
+*.pem
+.vscode
+.idea
+
+# Docs not needed in image
+*.md
+!README.md
+
+# CI / misc
+coverage
+.vercel
+.cursor
+agent-transcripts
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Supabase local
+supabase/.temp

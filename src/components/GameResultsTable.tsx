@@ -1,14 +1,27 @@
+"use client";
+
+import { Input } from "@/components/ui/input";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { formatDate } from "@/lib/utils";
 import type { ExtractedGame } from "@/types";
 
 interface GameResultsTableProps {
   games: ExtractedGame[];
+  editable?: boolean;
+  onUpdate?: (id: string, field: string, value: string) => void;
 }
 
-export function GameResultsTable({ games }: GameResultsTableProps) {
+export function GameResultsTable({
+  games,
+  editable = false,
+  onUpdate,
+}: GameResultsTableProps) {
   if (games.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4">No game results extracted yet.</p>;
+    return (
+      <p className="text-sm text-muted-foreground py-4">
+        No game results extracted yet.
+      </p>
+    );
   }
 
   return (
@@ -27,8 +40,32 @@ export function GameResultsTable({ games }: GameResultsTableProps) {
           {games.map((game) => (
             <tr key={game.id} className="border-b border-muted">
               <td className="py-2 pr-4">{formatDate(game.game_date)}</td>
-              <td className="py-2 pr-4">{game.opponent_name ?? "—"}</td>
-              <td className="py-2 pr-4">{game.result ?? "—"}</td>
+              <td className="py-2 pr-4">
+                {editable ? (
+                  <Input
+                    className="h-8"
+                    defaultValue={game.opponent_name ?? ""}
+                    onBlur={(e) =>
+                      onUpdate?.(game.id, "opponent_name", e.target.value)
+                    }
+                  />
+                ) : (
+                  game.opponent_name ?? "—"
+                )}
+              </td>
+              <td className="py-2 pr-4">
+                {editable ? (
+                  <Input
+                    className="h-8 w-24"
+                    defaultValue={game.result ?? ""}
+                    onBlur={(e) =>
+                      onUpdate?.(game.id, "result", e.target.value)
+                    }
+                  />
+                ) : (
+                  game.result ?? "—"
+                )}
+              </td>
               <td className="py-2 pr-4">
                 {game.runs_for != null && game.runs_against != null
                   ? `${game.runs_for}-${game.runs_against}`

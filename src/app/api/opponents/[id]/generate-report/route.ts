@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSupabaseFromRequest } from "@/lib/supabase/request";
 import { generateScoutingReport } from "@/lib/ai";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: opponentId } = await params;
-  const supabase = await createClient();
+  const supabase = await getSupabaseFromRequest(request);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -15,6 +15,12 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const body = await request.json().catch(() => ({}));
+  const title =
+    typeof body.title === "string" && body.title.trim()
+      ? body.title.trim()
+      : `Scouting Report — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 
   const { data: opponent, error: oppError } = await supabase
     .from("opponents")
@@ -33,18 +39,9 @@ export async function POST(
     { data: pitchingStats },
     { data: games },
   ] = await Promise.all([
-    supabase
-      .from("extracted_players")
-      .select("*")
-      .eq("opponent_id", opponentId),
-    supabase
-      .from("extracted_batting_stats")
-      .select("*")
-      .eq("opponent_id", opponentId),
-    supabase
-      .from("extracted_pitching_stats")
-      .select("*")
-      .eq("opponent_id", opponentId),
+    supabase.from("extracted_players").select("*").eq("opponent_id", opponentId),
+    supabase.from("extracted_batting_stats").select("*").eq("opponent_id", opponentId),
+    supabase.from("extracted_pitching_stats").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_games").select("*").eq("opponent_id", opponentId),
   ]);
 
@@ -76,6 +73,7 @@ export async function POST(
       .insert({
         opponent_id: opponentId,
         user_id: user.id,
+        title,
         report_json: reportJson,
         report_text: reportText,
       })
@@ -90,8 +88,7 @@ export async function POST(
   } catch (err) {
     return NextResponse.json(
       {
-        error:
-          err instanceof Error ? err.message : "Report generation failed",
+        error: err instanceof Error ? err.message : "Report generation failed",
       },
       { status: 500 }
     );

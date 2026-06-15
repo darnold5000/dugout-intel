@@ -2,6 +2,9 @@ import OpenAI from "openai";
 import type { AIExtractionResult, ScoutingReportJson } from "@/types";
 
 function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
@@ -45,34 +48,47 @@ Return ONLY valid JSON matching this schema:
 }`;
 
 export async function extractFromScreenshot(
-  imageUrl: string
+  imageDataUrl: string
 ): Promise<AIExtractionResult> {
-  const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Extract all baseball data from this GameChanger screenshot. Return structured JSON only.",
-          },
-          {
-            type: "image_url",
-            image_url: { url: imageUrl, detail: "high" },
-          },
-        ],
-      },
-    ],
-    response_format: { type: "json_object" },
-    max_tokens: 4096,
-  });
+  let response;
+  try {
+    response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all baseball data from this GameChanger screenshot. Return structured JSON only.",
+            },
+            {
+              type: "image_url",
+              image_url: { url: imageDataUrl, detail: "high" },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 4096,
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "OpenAI request failed";
+    throw new Error(`OpenAI error: ${message}`);
+  }
 
   const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("No extraction response from AI");
+  if (!content) {
+    throw new Error("OpenAI returned empty extraction response");
+  }
 
-  return JSON.parse(content) as AIExtractionResult;
+  try {
+    return JSON.parse(content) as AIExtractionResult;
+  } catch {
+    throw new Error("Failed to parse OpenAI extraction JSON response");
+  }
 }
 
 export async function generateScoutingReport(data: {
@@ -83,23 +99,30 @@ export async function generateScoutingReport(data: {
   pitchingStats: unknown[];
   games: unknown[];
 }): Promise<{ reportJson: ScoutingReportJson; reportText: string }> {
-  const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: REPORT_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Generate a scouting report for opponent "${data.opponentName}" (${data.ageLevel}).
+  let response;
+  try {
+    response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: REPORT_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Generate a scouting report for opponent "${data.opponentName}" (${data.ageLevel}).
 
 Extracted data:
 ${JSON.stringify(data, null, 2)}
 
 Write practical advice for a youth baseball coach preparing to play this team.`,
-      },
-    ],
-    response_format: { type: "json_object" },
-    max_tokens: 4096,
-  });
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 4096,
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "OpenAI request failed";
+    throw new Error(`OpenAI error: ${message}`);
+  }
 
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("No report response from AI");
@@ -143,4 +166,13 @@ function formatReportText(
   ];
 
   return sections.join("\n");
+}
+
+export async function fileToDataUrl(
+  file: Blob,
+  fallbackMime = "image/png"
+): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || fallbackMime;
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
 }

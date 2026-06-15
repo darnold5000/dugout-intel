@@ -41,6 +41,7 @@ export interface ScreenshotUpload {
   file_path: string;
   screenshot_type: ScreenshotType | null;
   extraction_status: ExtractionStatus;
+  extraction_error: string | null;
   created_at: string;
 }
 
@@ -114,10 +115,29 @@ export interface ScoutingReport {
   id: string;
   opponent_id: string;
   user_id: string;
+  title: string | null;
+  share_token: string | null;
   report_json: ScoutingReportJson;
   report_text: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExtractionSummary {
+  players: number;
+  batting_stats: number;
+  pitching_stats: number;
+  games: number;
+}
+
+export interface ExtractionResult {
+  upload_id: string;
+  status: "complete" | "failed";
+  screenshot_type?: string;
+  counts?: ExtractionSummary;
+  warnings?: string[];
+  unknowns?: string[];
+  error?: string;
 }
 
 export interface ScoutingReportJson {
