@@ -10,6 +10,7 @@ import { ScreenshotUploader } from "@/components/ScreenshotUploader";
 import { UploadedScreenshotGrid } from "@/components/UploadedScreenshotGrid";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ArrowLeft, Sparkles } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import type { OpponentDetail, ScreenshotUpload } from "@/types";
 
 export default function UploadPage() {
@@ -33,11 +34,23 @@ export default function UploadPage() {
   }, [fetchOpponent]);
 
   const handleUpload = async (files: File[]) => {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Not authenticated. Please sign in again.");
+    }
+
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
 
     const res = await fetch(`/api/opponents/${id}/upload`, {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
       body: formData,
     });
 

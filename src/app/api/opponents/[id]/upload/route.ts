@@ -1,17 +1,37 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/admin";
+import { createClientFromAccessToken } from "@/lib/supabase/server";
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: opponentId } = await params;
-  const supabase = await createClient();
+
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    console.log("[upload] auth: missing or invalid Authorization header");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const accessToken = authHeader.slice("Bearer ".length).trim();
+  if (!accessToken) {
+    console.log("[upload] auth: empty access token");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabase = createClientFromAccessToken(accessToken);
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  console.log(
+    "[upload] user verified:",
+    !!user,
+    user ? `id=${user.id}` : authError?.message ?? "no user"
+  );
+
+  if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -33,7 +53,6 @@ export async function POST(
     return NextResponse.json({ error: "No files provided" }, { status: 400 });
   }
 
-  const admin = createServiceClient();
   const uploads = [];
 
   for (const file of files) {
@@ -43,7 +62,7 @@ export async function POST(
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const { error: storageError } = await admin.storage
+    const { error: storageError } = await supabase.storage
       .from("gamechanger-screenshots")
       .upload(filePath, buffer, {
         contentType: file.type,
@@ -51,6 +70,7 @@ export async function POST(
       });
 
     if (storageError) {
+      console.log("[upload] storage error:", storageError.message);
       return NextResponse.json(
         { error: `Upload failed: ${storageError.message}` },
         { status: 500 }
@@ -59,7 +79,7 @@ export async function POST(
 
     const {
       data: { publicUrl },
-    } = admin.storage.from("gamechanger-screenshots").getPublicUrl(filePath);
+    } = supabase.storage.from("gamechanger-screenshots").getPublicUrl(filePath);
 
     const { data: upload, error: dbError } = await supabase
       .from("screenshot_uploads")
@@ -75,11 +95,13 @@ export async function POST(
       .single();
 
     if (dbError) {
+      console.log("[upload] db error:", dbError.message);
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
 
     uploads.push(upload);
   }
 
+  console.log("[upload] success:", uploads.length, "file(s) for user", user.id);
   return NextResponse.json(uploads, { status: 201 });
 }
