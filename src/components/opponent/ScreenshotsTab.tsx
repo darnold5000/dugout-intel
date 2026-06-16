@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RawExtractedTableViewer } from "@/components/RawExtractedTableViewer";
 import { ScreenshotUploader } from "@/components/ScreenshotUploader";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { getAuthHeaders } from "@/lib/auth-headers";
@@ -173,6 +174,17 @@ export function ScreenshotsTab({
                 <strong>{extractionResult.totals.games}</strong>
               </div>
             </div>
+            {extractionResult.results.map((result) =>
+              result.status === "complete" &&
+              (result.raw_extracted_table || result.warnings?.length) ? (
+                <div key={result.upload_id} className="mt-4">
+                  <RawExtractedTableViewer
+                    table={result.raw_extracted_table ?? null}
+                    warnings={result.warnings}
+                  />
+                </div>
+              ) : null
+            )}
           </CardContent>
         </Card>
       )}
@@ -217,6 +229,10 @@ export function ScreenshotsTab({
                       {upload.extraction_error}
                     </p>
                   )}
+                  <RawExtractedTableViewer
+                    table={upload.raw_extracted_table}
+                    warnings={upload.extraction_warnings}
+                  />
                   <div className="flex gap-2 pt-1">
                     {(upload.extraction_status === "failed" ||
                       upload.extraction_status === "complete") && (

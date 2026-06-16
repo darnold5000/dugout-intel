@@ -1,11 +1,17 @@
 export type ScreenshotType =
   | "roster"
-  | "schedule"
-  | "box_score"
   | "batting_stats"
   | "pitching_stats"
-  | "game_summary"
-  | "unknown";
+  | "schedule_results"
+  | "box_score"
+  | "unknown"
+  | "schedule"
+  | "game_summary";
+
+export interface RawExtractedTable {
+  headers: string[];
+  rows: string[][];
+}
 
 export type ExtractionStatus =
   | "pending"
@@ -42,6 +48,8 @@ export interface ScreenshotUpload {
   screenshot_type: ScreenshotType | null;
   extraction_status: ExtractionStatus;
   extraction_error: string | null;
+  raw_extracted_table: RawExtractedTable | null;
+  extraction_warnings: string[] | null;
   created_at: string;
 }
 
@@ -135,6 +143,7 @@ export interface ExtractionResult {
   status: "complete" | "failed";
   screenshot_type?: string;
   counts?: ExtractionSummary;
+  raw_extracted_table?: RawExtractedTable | null;
   warnings?: string[];
   unknowns?: string[];
   error?: string;
@@ -154,6 +163,7 @@ export interface ScoutingReportJson {
 export interface AIExtractionResult {
   screenshot_type: ScreenshotType;
   team_name: string | null;
+  raw_extracted_table: RawExtractedTable;
   players: {
     name: string | null;
     jersey_number: string | null;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseFromRequest } from "@/lib/supabase/request";
 import { extractFromScreenshot, fileToDataUrl } from "@/lib/ai";
+import { normalizeScreenshotType } from "@/lib/extraction/post-process";
 import type { ExtractionResult } from "@/types";
 
 export async function POST(
@@ -214,8 +215,10 @@ export async function POST(
         .from("screenshot_uploads")
         .update({
           extraction_status: "complete",
-          screenshot_type: extraction.screenshot_type,
+          screenshot_type: normalizeScreenshotType(extraction.screenshot_type),
           extraction_error: null,
+          raw_extracted_table: extraction.raw_extracted_table,
+          extraction_warnings: extraction.warnings,
         })
         .eq("id", upload.id);
 
@@ -224,6 +227,7 @@ export async function POST(
         status: "complete",
         screenshot_type: extraction.screenshot_type,
         counts,
+        raw_extracted_table: extraction.raw_extracted_table,
         warnings: extraction.warnings,
         unknowns: extraction.unknowns,
       });

@@ -32,9 +32,11 @@ CREATE TABLE screenshot_uploads (
   opponent_id UUID NOT NULL REFERENCES opponents(id) ON DELETE CASCADE,
   file_url TEXT NOT NULL,
   file_path TEXT NOT NULL,
-  screenshot_type TEXT CHECK (screenshot_type IN ('roster', 'schedule', 'box_score', 'batting_stats', 'pitching_stats', 'game_summary', 'unknown')),
+  screenshot_type TEXT CHECK (screenshot_type IN ('roster', 'batting_stats', 'pitching_stats', 'schedule_results', 'box_score', 'schedule', 'game_summary', 'unknown')),
   extraction_status TEXT NOT NULL DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'processing', 'complete', 'failed')),
   extraction_error TEXT,
+  raw_extracted_table JSONB,
+  extraction_warnings TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
