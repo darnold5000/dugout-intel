@@ -42,6 +42,9 @@ steps:
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}
 
   # Deploy to Cloud Run
+  # NOTE: NEXT_PUBLIC_* are baked into the image at build time only.
+  # Do NOT set them again at runtime — gcloud can mangle URLs containing
+  # "https://" when using --set-env-vars, causing duplicated Supabase URLs.
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: deploy
     entrypoint: gcloud
@@ -59,7 +62,6 @@ steps:
       - --min-instances=0
       - --max-instances=10
       - --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest
-      - --set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$COMMIT_SHA

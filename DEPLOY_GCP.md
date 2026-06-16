@@ -11,13 +11,13 @@ This app uses Next.js `output: "standalone"`. The Docker image runs `node server
 
 | Variable | When set | Server / client | Secret? |
 |----------|----------|-----------------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | **Build time** (and runtime on Cloud Run) | Both | No |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Build time** (and runtime on Cloud Run) | Both | No (public anon key) |
+| `NEXT_PUBLIC_SUPABASE_URL` | **Build time only** (Docker `--build-arg`) | Both (inlined at build) | No |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Build time only** (Docker `--build-arg`) | Both (inlined at build) | No (public anon key) |
 | `OPENAI_API_KEY` | **Runtime only** | Server | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Runtime only** | Server | Yes |
 | `PORT` | **Runtime** (set by Cloud Run) | Server | No |
 
-**Important:** `NEXT_PUBLIC_*` values are embedded in the client JavaScript bundle during `npm run build`. Pass them as Docker `--build-arg` values when building the image. Server-only secrets must never be build args.
+**Important:** `NEXT_PUBLIC_*` values are embedded in the client JavaScript bundle during `npm run build`. Pass them as Docker `--build-arg` values when building the image. Do **not** set `NEXT_PUBLIC_*` on Cloud Run at runtime — `gcloud --set-env-vars` can mangle URLs containing `https://`, producing duplicated Supabase URLs like `https://xxx.supabase.cohttps://xxx.supabase.co`. Server-only secrets must never be build args.
 
 After deploy, verify config (booleans only, no secret values):
 
@@ -32,6 +32,8 @@ Expected:
   "status": "ok",
   "service": "dugout-intel",
   "port": 8080,
+  "supabaseHost": "oshpxrqeuittyobrwvpt.supabase.co",
+  "supabaseUrlValid": true,
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": true,
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": true,
@@ -205,9 +207,10 @@ gcloud run deploy "$SERVICE" \
   --cpu=1 \
   --min-instances=0 \
   --max-instances=10 \
-  --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest" \
-  --set-env-vars="NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
+  --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest"
 ```
+
+Do **not** pass `NEXT_PUBLIC_*` via `--set-env-vars` on Cloud Run. Those values are already baked into the image at build time.
 
 ---
 
@@ -282,11 +285,26 @@ After deploy, add your Cloud Run URL to Supabase:
 
 | Symptom | Likely cause |
 |---------|----------------|
+| Duplicated Supabase URL (`...cohttps://...`) | Stale `NEXT_PUBLIC_*` env vars on Cloud Run from `--set-env-vars`; remove them and redeploy |
 | Container fails to start | Check Cloud Run logs; verify image built with standalone output |
 | `502` / connection refused | App must listen on `0.0.0.0:$PORT` — standalone `server.js` does this |
 | Login works locally but not in prod | Supabase redirect URLs not updated; `NEXT_PUBLIC_*` wrong at build time |
 | AI extraction fails | `OPENAI_API_KEY` secret missing or Cloud Run SA lacks accessor role |
 | Share links fail | `SUPABASE_SERVICE_ROLE_KEY` secret missing |
+
+### Fix duplicated Supabase URL on Cloud Run
+
+If auth requests go to `https://xxx.supabase.cohttps://xxx.supabase.co/auth/v1/...`, remove stale runtime env vars and redeploy:
+
+```bash
+gcloud run services update dugout-intel \
+  --region=us-central1 \
+  --remove-env-vars=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+gcloud builds submit \
+  --config=cloudbuild.yaml \
+  --substitutions=_NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL",_NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+```
 | Health shows `OPENAI_API_KEY: false` | Secret not mounted — re-run deploy with `--set-secrets` |
 
 ---

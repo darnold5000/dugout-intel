@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseConfig } from "./config";
+import { getServerEnv } from "@/lib/env";
 
 export function createServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const { url } = getSupabaseConfig();
+  return createClient(url, getServerEnv("SUPABASE_SERVICE_ROLE_KEY"));
 }

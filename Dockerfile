@@ -23,6 +23,15 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+# Fail fast if Supabase URL is duplicated or malformed at build time
+RUN node -e "\
+  const u=process.env.NEXT_PUBLIC_SUPABASE_URL||'';\
+  const count=(u.match(/supabase\\.co/gi)||[]).length;\
+  if(!u||count!==1||!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co\\/?\$/.test(u.replace(/\\/+$/,'')){\
+    console.error('Invalid NEXT_PUBLIC_SUPABASE_URL at build:',u);\
+    process.exit(1);\
+  }"
+
 RUN npm run build
 
 # ---- Runner ----
