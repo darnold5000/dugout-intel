@@ -83,6 +83,7 @@ export interface ExtractedBattingStat {
   stolen_bases: number | null;
   confidence: number;
   source_upload_id: string | null;
+  source_upload_ids?: string[] | null;
   created_at: string;
 }
 
@@ -102,6 +103,7 @@ export interface ExtractedPitchingStat {
   runs_allowed: number | null;
   confidence: number;
   source_upload_id: string | null;
+  source_upload_ids?: string[] | null;
   created_at: string;
 }
 

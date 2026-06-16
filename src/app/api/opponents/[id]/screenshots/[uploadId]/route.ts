@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseFromRequest } from "@/lib/supabase/request";
+import { rebuildOpponentStats } from "@/lib/extraction/rebuild-opponent-stats";
 
 export async function DELETE(
   request: Request,
@@ -52,5 +53,15 @@ export async function DELETE(
   }
 
   console.log("[delete-screenshot] deleted:", uploadId, "for user", user.id);
+
+  try {
+    await rebuildOpponentStats(supabase, opponentId);
+  } catch (err) {
+    console.log(
+      "[delete-screenshot] rebuild stats warning:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   return NextResponse.json({ success: true });
 }

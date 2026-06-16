@@ -72,6 +72,7 @@ CREATE TABLE extracted_batting_stats (
   stolen_bases INTEGER,
   confidence NUMERIC NOT NULL DEFAULT 0,
   source_upload_id UUID REFERENCES screenshot_uploads(id) ON DELETE SET NULL,
+  source_upload_ids UUID[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -92,6 +93,7 @@ CREATE TABLE extracted_pitching_stats (
   runs_allowed INTEGER,
   confidence NUMERIC NOT NULL DEFAULT 0,
   source_upload_id UUID REFERENCES screenshot_uploads(id) ON DELETE SET NULL,
+  source_upload_ids UUID[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
