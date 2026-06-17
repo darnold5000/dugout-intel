@@ -1,5 +1,6 @@
 import type { AIExtractionResult, RawExtractedTable } from "@/types";
 import {
+  getConsolidationKey,
   isExcludedPlayerRow,
   parsePlayerIdentity,
 } from "@/lib/extraction/player-identity";
@@ -140,13 +141,14 @@ export function mergeBattingStatRows(
     if (!battingHasStats(row)) continue;
 
     const identity = parsePlayerIdentity(row.player_name, row.jersey_number);
-    if (!identity.merge_key) continue;
+    const key = getConsolidationKey(row.player_name, row.jersey_number);
+    if (!key) continue;
 
     const meta: FieldMeta = { confidence: row.confidence, order };
-    const existing = byKey.get(identity.merge_key);
+    const existing = byKey.get(key);
 
     if (!existing) {
-      byKey.set(identity.merge_key, {
+      byKey.set(key, {
         identity,
         row: {
           ...row,
@@ -231,13 +233,14 @@ export function mergePitchingStatRows(
     if (!pitchingHasStats(row)) continue;
 
     const identity = parsePlayerIdentity(row.player_name, row.jersey_number);
-    if (!identity.merge_key) continue;
+    const key = getConsolidationKey(row.player_name, row.jersey_number);
+    if (!key) continue;
 
     const meta: FieldMeta = { confidence: row.confidence, order };
-    const existing = byKey.get(identity.merge_key);
+    const existing = byKey.get(key);
 
     if (!existing) {
-      byKey.set(identity.merge_key, {
+      byKey.set(key, {
         identity,
         row: {
           ...row,
@@ -319,11 +322,12 @@ export function mergePlayerRows(
     if (isExcludedPlayerRow(row.name)) continue;
 
     const identity = parsePlayerIdentity(row.name, row.jersey_number);
-    if (!identity.merge_key) continue;
+    const key = getConsolidationKey(row.name, row.jersey_number);
+    if (!key) continue;
 
-    const existing = byKey.get(identity.merge_key);
+    const existing = byKey.get(key);
     if (!existing) {
-      byKey.set(identity.merge_key, {
+      byKey.set(key, {
         identity,
         row: {
           ...row,

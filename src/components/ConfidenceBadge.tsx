@@ -1,19 +1,31 @@
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { NeedsReviewIndicator } from "@/components/NeedsReviewIndicator";
 
 interface ConfidenceBadgeProps {
   confidence: number;
+  needsReview?: boolean;
+  hasConflict?: boolean;
+  forceShow?: boolean;
   className?: string;
 }
 
-export function ConfidenceBadge({ confidence, className }: ConfidenceBadgeProps) {
-  const pct = Math.round(confidence * 100);
-  const variant =
-    pct >= 80 ? "success" : pct >= 50 ? "warning" : "destructive";
+/** Only surfaces confidence when there is a problem worth reviewing. */
+export function ConfidenceBadge({
+  confidence,
+  needsReview = false,
+  hasConflict = false,
+  forceShow = false,
+  className,
+}: ConfidenceBadgeProps) {
+  if (confidence >= 0.95 && !needsReview && !hasConflict && !forceShow) {
+    return null;
+  }
 
   return (
-    <Badge variant={variant} className={cn(className)}>
-      {pct}% confidence
-    </Badge>
+    <NeedsReviewIndicator
+      confidence={confidence}
+      needsReview={needsReview || confidence < 0.9}
+      hasConflict={hasConflict}
+      className={className}
+    />
   );
 }

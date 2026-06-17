@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AIExtractionResult, ExtractionSummary } from "@/types";
 import {
+  buildMergeDiagnostic,
+  findPotentialDuplicates,
+  type MergeDiagnostic,
+  type PotentialDuplicate,
+} from "@/lib/extraction/player-identity";
+import {
   consolidateExtractions,
   extractionFromRawTable,
 } from "@/lib/extraction/consolidate-stats";
@@ -12,11 +18,20 @@ interface CompleteUpload {
   raw_extracted_table: AIExtractionResult["raw_extracted_table"] | null;
 }
 
+export interface RebuildResult {
+  counts: ExtractionSummary;
+  warnings: string[];
+  merge_diagnostics: MergeDiagnostic[];
+  potential_duplicates: PotentialDuplicate[];
+  duplicate_player_count: number;
+}
+
 export async function rebuildOpponentStats(
   supabase: SupabaseClient,
   opponentId: string,
-  freshExtractions: Map<string, AIExtractionResult> = new Map()
-): Promise<{ counts: ExtractionSummary; warnings: string[] }> {
+  freshExtractions: Map<string, AIExtractionResult> = new Map(),
+  options: { includeDiagnostics?: boolean } = {}
+): Promise<RebuildResult> {
   const { data: uploads, error: fetchError } = await supabase
     .from("screenshot_uploads")
     .select("id, created_at, screenshot_type, raw_extracted_table, extraction_status")
@@ -30,6 +45,8 @@ export async function rebuildOpponentStats(
   }
 
   const completeUploads = (uploads ?? []) as CompleteUpload[];
+  const merge_diagnostics: MergeDiagnostic[] = [];
+  const rawIdentityEntries: Array<{ name: string | null; jersey: string | null }> = [];
 
   const extractionInputs = completeUploads.map((upload, index) => {
     const extraction =
@@ -39,6 +56,27 @@ export async function rebuildOpponentStats(
         upload.screenshot_type
       );
 
+    if (options.includeDiagnostics !== false) {
+      for (const row of extraction.batting_stats) {
+        merge_diagnostics.push(
+          buildMergeDiagnostic(row.player_name, row.jersey_number)
+        );
+        rawIdentityEntries.push({
+          name: row.player_name,
+          jersey: row.jersey_number,
+        });
+      }
+      for (const row of extraction.pitching_stats) {
+        merge_diagnostics.push(
+          buildMergeDiagnostic(row.player_name, row.jersey_number)
+        );
+        rawIdentityEntries.push({
+          name: row.player_name,
+          jersey: row.jersey_number,
+        });
+      }
+    }
+
     return {
       uploadId: upload.id,
       order: index,
@@ -47,6 +85,7 @@ export async function rebuildOpponentStats(
   });
 
   const consolidated = consolidateExtractions(extractionInputs);
+  const potential_duplicates = findPotentialDuplicates(rawIdentityEntries);
 
   await supabase
     .from("extracted_players")
@@ -130,13 +169,19 @@ export async function rebuildOpponentStats(
     if (error) throw new Error(`Failed to save games: ${error.message}`);
   }
 
+  const playerCount = consolidated.players.length;
+  const battingCount = consolidated.batting_stats.length;
+
   return {
     counts: {
-      players: consolidated.players.length,
-      batting_stats: consolidated.batting_stats.length,
+      players: playerCount,
+      batting_stats: battingCount,
       pitching_stats: consolidated.pitching_stats.length,
       games: consolidated.games.length,
     },
     warnings: consolidated.warnings,
+    merge_diagnostics,
+    potential_duplicates,
+    duplicate_player_count: potential_duplicates.length,
   };
 }

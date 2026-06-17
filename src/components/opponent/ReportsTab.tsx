@@ -169,8 +169,57 @@ export function ReportsTab({
 
   const handlePrint = () => window.print();
 
+  const latestReport = reports[0] ?? null;
+  const displayReport = selectedReport ?? latestReport;
+
   return (
     <div className="space-y-6">
+      {displayReport && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg">Scouting Report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {displayReport.title ?? "Scouting Report"} ·{" "}
+              {formatDate(displayReport.created_at)}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ScoutingReportViewer report={displayReport} />
+            <div className="flex flex-wrap gap-2 no-print">
+              <Button onClick={handleGenerate} disabled={generating}>
+                <Sparkles className="h-4 w-4 mr-1" />
+                {generating ? "Generating..." : "Generate New Report"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setFullScreenReport(displayReport)}
+              >
+                <Maximize2 className="h-4 w-4 mr-1" />
+                Open Full Report
+              </Button>
+              <Button variant="outline" onClick={handlePrint}>
+                Print / PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleDownload(displayReport)}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleShare(displayReport)}
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {reports.length === 0 && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Generate New Report</CardTitle>
@@ -206,6 +255,41 @@ export function ReportsTab({
           </Button>
         </CardContent>
       </Card>
+      )}
+
+      {reports.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">New Report Options</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Report title</Label>
+                <select
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {REPORT_TITLES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Custom title (optional)</Label>
+                <Input
+                  placeholder="Override title..."
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {generating && (
         <LoadingSpinner label="AI is writing your scouting report..." />
@@ -331,29 +415,6 @@ export function ReportsTab({
               })}
             </div>
           </div>
-
-          {selectedReport && (
-            <div>
-              <div className="flex items-center justify-between mb-4 no-print">
-                <h3 className="font-semibold">Report Preview</h3>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setFullScreenReport(selectedReport)}
-                  >
-                    <Maximize2 className="h-4 w-4 mr-1" />
-                    Open Full Report
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handlePrint}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Print / PDF
-                  </Button>
-                </div>
-              </div>
-              <ScoutingReportViewer report={selectedReport} />
-            </div>
-          )}
         </>
       )}
 

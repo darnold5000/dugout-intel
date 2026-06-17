@@ -6,5 +6,5 @@ export default async function ExtractedDataRedirect({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/opponents/${id}?tab=data`);
+  redirect(`/opponents/${id}?tab=overview`);
 }

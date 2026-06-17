@@ -30,15 +30,18 @@ export async function POST(
   }
 
   try {
-    const { counts, warnings } = await rebuildOpponentStats(
+    const result = await rebuildOpponentStats(
       supabase,
       opponentId
     );
 
     return NextResponse.json({
       success: true,
-      counts,
-      warnings,
+      counts: result.counts,
+      warnings: result.warnings,
+      merge_diagnostics: result.merge_diagnostics,
+      potential_duplicates: result.potential_duplicates,
+      duplicate_player_count: result.duplicate_player_count,
     });
   } catch (err) {
     const message =
