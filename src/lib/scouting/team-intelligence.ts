@@ -7,13 +7,13 @@ import {
 } from "@/lib/scouting/player-profiles";
 import type {
   ConfidenceByCategory,
+  ExtractedPitchingStat,
   FirstPitchAnalysis,
   LeaderEntry,
   OpponentDetail,
   PitchingLeaders,
   PitchingTierGroup,
   PlayerScoutingCard,
-  RawExtractedTable,
   ScreenshotUpload,
   TeamIdentity,
   TeamIntelligence,
@@ -23,6 +23,29 @@ import type {
 interface AdvancedPitchingStats {
   first_pitch_strike_pct: number | null;
   batters_faced: number | null;
+}
+
+function pitchCount(p: ExtractedPitchingStat | null | undefined): number | null {
+  if (!p) return null;
+  return p.total_pitches ?? p.pitches;
+}
+
+function getWalksPerInning(profile: PlayerProfile): number | null {
+  const p = profile.pitching;
+  if (!p) return null;
+  if (p.walks_per_inning != null) return p.walks_per_inning;
+  if (!p.innings_pitched || p.innings_pitched <= 0) return null;
+  return (p.walks ?? 0) / p.innings_pitched;
+}
+
+function getFps(
+  profile: PlayerProfile,
+  advancedMap: Map<string, AdvancedPitchingStats>
+): number | null {
+  if (profile.pitching?.first_pitch_strike_pct != null) {
+    return profile.pitching.first_pitch_strike_pct;
+  }
+  return getAdvancedPitching(profile, advancedMap).first_pitch_strike_pct;
 }
 
 function sortByDesc<T>(items: T[], getter: (item: T) => number | null): T[] {
@@ -181,12 +204,6 @@ function buildOffensiveLeaders(
   };
 }
 
-function walkRate(profile: PlayerProfile): number | null {
-  const p = profile.pitching;
-  if (!p?.innings_pitched || p.innings_pitched <= 0) return null;
-  return (p.walks ?? 0) / p.innings_pitched;
-}
-
 function strikeoutRate(profile: PlayerProfile): number | null {
   const p = profile.pitching;
   if (!p?.innings_pitched || p.innings_pitched <= 0) return null;
@@ -200,53 +217,71 @@ function buildPitchingLeaders(profiles: PlayerProfile[]): PitchingLeaders {
 
   const byIp = sortByDesc(withPitching, (p) => p.pitching?.innings_pitched ?? null);
   const byLowWalkRate = sortByDesc(withPitching, (p) => {
-    const rate = walkRate(p);
+    const rate = getWalksPerInning(p);
     return rate != null ? -rate : null;
   });
   const byHighKRate = sortByDesc(withPitching, strikeoutRate);
-  const byHighWalkRate = sortByDesc(withPitching, walkRate);
+  const byHighWalkRate = sortByDesc(withPitching, getWalksPerInning);
   const byLowKRate = sortByDesc(withPitching, (p) => {
     const rate = strikeoutRate(p);
     return rate != null ? -rate : null;
   });
+  const bySwingMiss = sortByDesc(withPitching, (p) => p.pitching?.swing_miss_pct ?? null);
 
   const ace = byIp[0];
   const strikeThrower = byLowWalkRate[0];
-  const swingMiss = byHighKRate[0];
+  const swingMiss = bySwingMiss[0] ?? byHighKRate[0];
   const controlProblems = byHighWalkRate[0];
   const contactPitcher = byLowKRate[0];
+
+  const aceLabel = (p: PlayerProfile) => {
+    const pitches = pitchCount(p.pitching);
+    const bf = p.pitching?.batters_faced;
+    const parts = [`${p.pitching!.innings_pitched!.toFixed(1)} IP`];
+    if (pitches != null) parts.push(`${pitches} pitches`);
+    if (bf != null) parts.push(`${bf} BF`);
+    return parts.join(", ");
+  };
 
   return {
     ace_pitcher: ace
       ? leader(
           "Ace Pitcher",
           ace,
-          `${ace.pitching!.innings_pitched!.toFixed(1)} IP`,
-          "Most innings pitched — likely primary starter."
+          aceLabel(ace),
+          `${formatPlayerLabel(ace)} appears to be the primary pitcher with ${aceLabel(ace)}.`
         )
       : null,
     strike_thrower: strikeThrower
       ? leader(
           "Strike Thrower",
           strikeThrower,
-          `BB/INN ${(walkRate(strikeThrower) ?? 0).toFixed(2)}`,
-          "Lowest walk rate — attacks the zone."
+          strikeThrower.pitching?.k_bb_ratio != null
+            ? `K/BB ${strikeThrower.pitching.k_bb_ratio.toFixed(2)}`
+            : `BB/INN ${(getWalksPerInning(strikeThrower) ?? 0).toFixed(2)}`,
+          strikeThrower.pitching?.strike_percentage != null
+            ? `Throws strikes at ${formatPct(strikeThrower.pitching.strike_percentage)} — attacks the zone.`
+            : "Lowest walk rate — attacks the zone."
         )
       : null,
     swing_and_miss: swingMiss
       ? leader(
           "Swing and Miss",
           swingMiss,
-          `K/INN ${(strikeoutRate(swingMiss) ?? 0).toFixed(2)}`,
-          "Highest strikeout rate — swing-and-miss stuff."
+          swingMiss.pitching?.swing_miss_pct != null
+            ? `SM% ${formatPct(swingMiss.pitching.swing_miss_pct)}`
+            : `K/INN ${(strikeoutRate(swingMiss) ?? 0).toFixed(2)}`,
+          "Highest swing-and-miss profile — expect strikeouts."
         )
       : null,
     control_problems: controlProblems
       ? leader(
           "Control Problems",
           controlProblems,
-          `BB/INN ${(walkRate(controlProblems) ?? 0).toFixed(2)}`,
-          "Highest walk rate — expect free passes."
+          controlProblems.pitching?.walks_per_inning != null
+            ? `BB/INN ${controlProblems.pitching.walks_per_inning.toFixed(2)}`
+            : `BB/INN ${(getWalksPerInning(controlProblems) ?? 0).toFixed(2)}`,
+          `${formatPlayerLabel(controlProblems)} has command concerns — expect free passes.`
         )
       : null,
     contact_pitcher: contactPitcher
@@ -298,10 +333,11 @@ function buildThreatTiers(profiles: PlayerProfile[]): ThreatTierGroup {
 function pitcherWorkloadScore(profile: PlayerProfile): number {
   const p = profile.pitching;
   if (!p) return 0;
+  const pitches = pitchCount(p) ?? 0;
   return (
     (p.innings_pitched ?? 0) * 3 +
-    (p.pitches ?? 0) * 0.05 +
-    (p.walks != null && p.strikeouts != null ? p.strikeouts + p.walks : 0) * 0.1
+    pitches * 0.05 +
+    (p.batters_faced ?? 0) * 0.1
   );
 }
 
@@ -333,7 +369,7 @@ function buildFirstPitchAnalysis(
   const withFps = profiles
     .map((p) => ({
       profile: p,
-      fps: getAdvancedPitching(p, advancedMap).first_pitch_strike_pct,
+      fps: getFps(p, advancedMap),
     }))
     .filter((x) => x.fps != null) as Array<{
     profile: PlayerProfile;
@@ -343,14 +379,17 @@ function buildFirstPitchAnalysis(
   const sorted = [...withFps].sort((a, b) => b.fps - a.fps);
   const midpoint = Math.ceil(sorted.length / 2);
 
+  const fpsThresholdHigh = (fps: number) => (fps <= 1 ? fps * 100 : fps) >= 60;
+  const fpsThresholdLow = (fps: number) => (fps <= 1 ? fps * 100 : fps) < 50;
+
   return {
     gets_ahead: sorted.slice(0, midpoint).map(({ profile, fps }) =>
       leader(
         "Gets Ahead",
         profile,
         `FPS% ${formatPct(fps)}`,
-        fps >= 0.6
-          ? "Works ahead in counts — be ready to swing early."
+        fpsThresholdHigh(fps)
+          ? "Works ahead in counts — expect strikes early."
           : "Moderate first-pitch strike rate."
       )
     ),
@@ -362,7 +401,7 @@ function buildFirstPitchAnalysis(
           "Falls Behind",
           profile,
           `FPS% ${formatPct(fps)}`,
-          fps < 0.4
+          fpsThresholdLow(fps)
             ? "Frequently behind in counts — patient approach pays off."
             : "Can fall behind early — work counts."
         )
@@ -372,18 +411,19 @@ function buildFirstPitchAnalysis(
 
 function buildPitchCountLeaders(profiles: PlayerProfile[]): LeaderEntry[] {
   return sortByDesc(
-    profiles.filter((p) => (p.pitching?.pitches ?? 0) > 0),
-    (p) => p.pitching?.pitches ?? null
+    profiles.filter((p) => (pitchCount(p.pitching) ?? 0) > 0),
+    (p) => pitchCount(p.pitching)
   )
     .slice(0, 5)
-    .map((p) =>
-      leader(
+    .map((p) => {
+      const count = pitchCount(p.pitching)!;
+      return leader(
         "Pitch Count",
         p,
-        `${p.pitching!.pitches} pitches`,
-        "Heavy usage — likely a primary pitching option."
-      )
-    );
+        `${count} pitches`,
+        `${formatPlayerLabel(p)} has thrown ${count} pitches — likely a primary pitching option.`
+      );
+    });
 }
 
 function classifyLevel(value: number, high: number, low: number): string {
@@ -476,11 +516,17 @@ function buildPlayerScoutingCard(
 
   if (p?.innings_pitched != null) {
     parts.push(`IP: ${p.innings_pitched.toFixed(1)}`);
+    const pitches = pitchCount(p);
+    if (pitches != null) parts.push(`Pitches: ${pitches}`);
+    if (p.batters_faced != null) parts.push(`BF: ${p.batters_faced}`);
+    if (p.first_pitch_strike_pct != null)
+      parts.push(`FPS%: ${formatPct(p.first_pitch_strike_pct)}`);
     if (p.era != null) parts.push(`ERA: ${p.era.toFixed(2)}`);
     if (p.strikeouts != null) parts.push(`SO: ${p.strikeouts}`);
-    if (p.pitches != null) parts.push(`Pitches: ${p.pitches}`);
     if (p.strike_percentage != null)
-      parts.push(`Strike%: ${formatPct(p.strike_percentage)}`);
+      parts.push(`S%: ${formatPct(p.strike_percentage)}`);
+    if (p.walks_per_inning != null)
+      parts.push(`BB/INN: ${p.walks_per_inning.toFixed(2)}`);
   }
 
   let assessment = "Limited data available.";
@@ -512,15 +558,30 @@ function buildPlayerScoutingCard(
 
   if (p?.innings_pitched != null && role !== "hitter") {
     const kRate = strikeoutRate(profile) ?? 0;
-    const wRate = walkRate(profile) ?? 0;
-    if (kRate >= 1.5) {
-      assessment = "Swing-and-miss arm — expect strikeouts.";
+    const wRate = getWalksPerInning(profile) ?? 0;
+    const fps = p.first_pitch_strike_pct;
+    const label = formatPlayerLabel(profile);
+    const pitches = pitchCount(p);
+
+    if (fps != null && (fps <= 1 ? fps * 100 : fps) >= 60) {
+      assessment = `${label} works ahead well with a ${formatPct(fps)} first-pitch strike rate.`;
+      gamePlan = "Expect strikes early — be ready to swing on the first pitch.";
+    } else if (
+      fps != null &&
+      (fps <= 1 ? fps * 100 : fps) < 50 &&
+      wRate >= 0.8
+    ) {
+      assessment = `${label} has command concerns. FPS% is below 50% and BB/INN is high.`;
+      gamePlan =
+        "Take until strike one and force him into hitter counts.";
+    } else if (kRate >= 1.5 || (p.swing_miss_pct ?? 0) > 30) {
+      assessment = `${label} is a swing-and-miss arm — expect strikeouts.`;
       gamePlan = "Shorten swing. Put ball in play.";
     } else if (wRate >= 1.0) {
-      assessment = "Control issues — can fall behind in counts.";
+      assessment = `${label} has control issues — can fall behind in counts.`;
       gamePlan = "Be patient. Make them throw strikes.";
-    } else if ((p.innings_pitched ?? 0) >= 8) {
-      assessment = "Workhorse pitcher — primary arm.";
+    } else if ((p.innings_pitched ?? 0) >= 8 || (pitches ?? 0) >= 150) {
+      assessment = `${label} appears to be the primary pitcher with ${p.innings_pitched!.toFixed(1)} IP${pitches != null ? ` and ${pitches} total pitches` : ""}.`;
       gamePlan = "Be aggressive early. Don't let them settle in.";
     }
   }
@@ -592,7 +653,10 @@ export function buildTeamIntelligence(data: OpponentDetail): TeamIntelligence {
   );
 
   const dataGaps = collectDataGaps(data.screenshot_uploads, profiles);
-  if (firstPitchAnalysis.gets_ahead.length === 0) {
+  const hasPersistedFps = profiles.some(
+    (p) => p.pitching?.first_pitch_strike_pct != null
+  );
+  if (!hasPersistedFps && firstPitchAnalysis.gets_ahead.length === 0) {
     dataGaps.push("First-pitch strike data not available — upload advanced pitching screenshots.");
   }
 
@@ -654,16 +718,19 @@ export function intelligenceToReportJson(
     aiNarrative?.pitching_notes ??
     [
       intelligence.pitchingLeaders.ace_pitcher
-        ? `Ace: ${intelligence.pitchingLeaders.ace_pitcher.player_name} (${intelligence.pitchingLeaders.ace_pitcher.stat_line}).`
+        ? `${formatPlayerLabel({ name: intelligence.pitchingLeaders.ace_pitcher.player_name, jerseyNumber: intelligence.pitchingLeaders.ace_pitcher.jersey_number } as PlayerProfile)}: ${intelligence.pitchingLeaders.ace_pitcher.interpretation ?? intelligence.pitchingLeaders.ace_pitcher.stat_line}`
+        : "",
+      intelligence.firstPitchAnalysis.gets_ahead.length > 0
+        ? `Gets ahead: ${intelligence.firstPitchAnalysis.gets_ahead.map((p) => `${p.jersey_number ? `#${p.jersey_number} ` : ""}${p.player_name} (${p.stat_line})`).join("; ")}.`
+        : "",
+      intelligence.firstPitchAnalysis.falls_behind.length > 0
+        ? `Falls behind: ${intelligence.firstPitchAnalysis.falls_behind.map((p) => `${p.jersey_number ? `#${p.jersey_number} ` : ""}${p.player_name} (${p.stat_line})`).join("; ")}.`
+        : "",
+      intelligence.pitchingLeaders.control_problems
+        ? intelligence.pitchingLeaders.control_problems.interpretation
         : "",
       intelligence.pitchingHierarchy.tier_1.length > 0
         ? `Primary pitchers: ${intelligence.pitchingHierarchy.tier_1.join(", ")}.`
-        : "",
-      intelligence.firstPitchAnalysis.gets_ahead.length > 0
-        ? `Gets ahead: ${intelligence.firstPitchAnalysis.gets_ahead.map((p) => p.player_name).join(", ")}.`
-        : "",
-      intelligence.firstPitchAnalysis.falls_behind.length > 0
-        ? `Falls behind: ${intelligence.firstPitchAnalysis.falls_behind.map((p) => p.player_name).join(", ")}.`
         : "",
     ]
       .filter(Boolean)

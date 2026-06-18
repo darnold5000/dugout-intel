@@ -37,6 +37,8 @@ function extractionQualityBadge(upload: ScreenshotUpload): {
   }
   return { label: "High Confidence", variant: "success" };
 }
+
+interface ScreenshotsTabProps {
   opponentId: string;
   opponentName: string;
   uploads: ScreenshotUpload[];

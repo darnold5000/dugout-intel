@@ -90,13 +90,27 @@ function battingHasStats(row: BattingRow): boolean {
 function pitchingHasStats(row: PitchingRow): boolean {
   return [
     row.innings_pitched,
+    row.total_pitches,
     row.pitches,
+    row.batters_faced,
+    row.strikes,
     row.strike_percentage,
+    row.first_pitch_strike_pct,
     row.era,
     row.walks,
     row.strikeouts,
     row.hits_allowed,
     row.runs_allowed,
+    row.k_bb_ratio,
+    row.walks_per_inning,
+    row.pitches_per_inning,
+    row.pitches_per_batter_faced,
+    row.one_two_three_innings,
+    row.leadoff_outs,
+    row.swing_miss_pct,
+    row.baa,
+    row.babip,
+    row.fip,
   ].some((v) => v != null);
 }
 
@@ -115,12 +129,26 @@ const BATTING_FIELDS = [
 const PITCHING_FIELDS = [
   "innings_pitched",
   "pitches",
+  "total_pitches",
+  "batters_faced",
+  "strikes",
   "strike_percentage",
+  "first_pitch_strike_pct",
   "era",
   "walks",
   "strikeouts",
   "hits_allowed",
   "runs_allowed",
+  "k_bb_ratio",
+  "walks_per_inning",
+  "pitches_per_inning",
+  "pitches_per_batter_faced",
+  "one_two_three_innings",
+  "leadoff_outs",
+  "swing_miss_pct",
+  "baa",
+  "babip",
+  "fip",
 ] as const;
 
 function collectIdentityEntries<T extends { player_name?: string | null; name?: string | null; jersey_number?: string | null }>(
@@ -318,12 +346,16 @@ export function mergePitchingStatRows(
     existing.row.confidence = Math.max(existing.row.confidence, row.confidence);
   }
 
-  return Array.from(byKey.values()).map(({ identity, row, source_upload_ids }) => ({
-    ...row,
-    player_name: identity.player_name,
-    jersey_number: identity.jersey_number,
-    source_upload_ids: Array.from(source_upload_ids),
-  }));
+  return Array.from(byKey.values()).map(({ identity, row, source_upload_ids }) => {
+    if (row.total_pitches != null) row.pitches = row.total_pitches;
+    else if (row.pitches != null) row.total_pitches = row.pitches;
+    return {
+      ...row,
+      player_name: identity.player_name,
+      jersey_number: identity.jersey_number,
+      source_upload_ids: Array.from(source_upload_ids),
+    };
+  });
 }
 
 export function mergePlayerRows(

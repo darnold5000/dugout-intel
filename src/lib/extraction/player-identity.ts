@@ -42,7 +42,7 @@ function extractJerseyFromName(name: string): {
   jersey: string | null;
   unparsed: boolean;
 } {
-  let working = normalizeSpaces(name.replace(/,/g, " ").trim());
+  const working = normalizeSpaces(name.replace(/,/g, " ").trim());
 
   const patterns: RegExp[] = [
     /^#\s*(\d{1,3})\s+(.+)$/i,

@@ -257,6 +257,10 @@ export function pitchingSummary(profile: PlayerProfile): string {
   if (!p) return "No pitching data";
   const parts: string[] = [];
   if (p.innings_pitched != null) parts.push(`${p.innings_pitched.toFixed(1)} IP`);
+  const pitches = p.total_pitches ?? p.pitches;
+  if (pitches != null) parts.push(`${pitches} P`);
+  if (p.first_pitch_strike_pct != null)
+    parts.push(`FPS% ${p.first_pitch_strike_pct <= 1 ? (p.first_pitch_strike_pct * 100).toFixed(0) : p.first_pitch_strike_pct.toFixed(0)}`);
   if (p.era != null) parts.push(`ERA ${p.era.toFixed(2)}`);
   if (p.strikeouts != null) parts.push(`K ${p.strikeouts}`);
   return parts.length ? parts.join(" | ") : "Pitching stats partial";

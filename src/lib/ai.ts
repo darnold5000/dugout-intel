@@ -56,23 +56,34 @@ Map these into batting_stats when visible:
 - SO or K -> strikeouts
 - SB -> stolen_bases
 
+GAMECHANGER PITCHING STANDARD COLUMNS:
+IP, BF, P, S, S%, ERA, WHIP, BB, SO, K, H, BAA
+
 GAMECHANGER PITCHING ADVANCED COLUMNS:
-FPS%, S%, K/BB, BB/INN, P/IP, P/BF, 123INN, LOO, SM%, FIP, BABIP
+FPS%, K/BB, BB/INN, P/IP, P/BF, 123INN, LOO, SM%, FIP, BABIP
 
-Map FPS% -> first_pitch_strike_pct (as decimal)
-Map BF -> batters_faced
-Map WHIP -> whip
-Map BAA -> batting_avg_against
-
-Map these into pitching_stats when visible:
+Map into pitching_stats when visible:
 - IP -> innings_pitched
-- P or S -> pitches
-- S% -> strike_percentage (as decimal, example 65% -> 0.65)
+- BF -> batters_faced
+- P -> total_pitches (also set pitches to same value)
+- S -> strikes
+- S% -> strike_percentage (store as percentage points, e.g. 65% -> 65)
+- FPS% -> first_pitch_strike_pct (percentage points, e.g. 67.2% -> 67.2)
 - ERA -> era
 - BB -> walks
 - SO or K -> strikeouts
 - H -> hits_allowed
 - R or ER -> runs_allowed
+- BAA -> baa (decimal, e.g. .278 -> 0.278)
+- K/BB -> k_bb_ratio
+- BB/INN -> walks_per_inning
+- P/IP -> pitches_per_inning
+- P/BF -> pitches_per_batter_faced
+- 123INN -> one_two_three_innings
+- LOO -> leadoff_outs
+- SM% -> swing_miss_pct (percentage points)
+- BABIP -> babip
+- FIP -> fip
 
 TABLE EXTRACTION:
 Always populate raw_extracted_table when any tabular data is visible:
@@ -88,7 +99,7 @@ Return ONLY valid JSON matching this schema:
   "raw_extracted_table": { "headers": string[], "rows": string[][] },
   "players": [{ "name": string | null, "jersey_number": string | null, "positions": string[] | null, "confidence": number }],
   "batting_stats": [{ "player_name": string | null, "jersey_number": string | null, "avg": number | null, "obp": number | null, "ops": number | null, "hits": number | null, "walks": number | null, "strikeouts": number | null, "rbi": number | null, "runs": number | null, "stolen_bases": number | null, "confidence": number }],
-  "pitching_stats": [{ "player_name": string | null, "jersey_number": string | null, "innings_pitched": number | null, "pitches": number | null, "strike_percentage": number | null, "era": number | null, "walks": number | null, "strikeouts": number | null, "hits_allowed": number | null, "runs_allowed": number | null, "confidence": number }],
+  "pitching_stats": [{ "player_name": string | null, "jersey_number": string | null, "innings_pitched": number | null, "pitches": number | null, "total_pitches": number | null, "batters_faced": number | null, "strikes": number | null, "strike_percentage": number | null, "first_pitch_strike_pct": number | null, "era": number | null, "walks": number | null, "strikeouts": number | null, "hits_allowed": number | null, "runs_allowed": number | null, "k_bb_ratio": number | null, "walks_per_inning": number | null, "pitches_per_inning": number | null, "pitches_per_batter_faced": number | null, "one_two_three_innings": number | null, "leadoff_outs": number | null, "swing_miss_pct": number | null, "baa": number | null, "babip": number | null, "fip": number | null, "confidence": number }],
   "games": [{ "opponent_name": string | null, "game_date": string | null, "result": string | null, "runs_for": number | null, "runs_against": number | null, "notes": string | null, "confidence": number }],
   "warnings": string[],
   "unknowns": string[]
@@ -215,14 +226,6 @@ ${JSON.stringify(
   const reportText = formatIntelligenceReportText(data.opponentName, reportJson);
 
   return { reportJson, reportText };
-}
-
-/** @deprecated Use formatIntelligenceReportText via generateScoutingReport */
-function formatReportText(
-  opponentName: string,
-  report: ScoutingReportJson
-): string {
-  return formatIntelligenceReportText(opponentName, report);
 }
 
 export async function fileToDataUrl(

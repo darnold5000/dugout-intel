@@ -21,5 +21,6 @@ export function formatStat(value: number | null, decimals = 3): string {
 
 export function formatPercent(value: number | null): string {
   if (value === null || value === undefined) return "—";
-  return `${(value * 100).toFixed(1)}%`;
+  const pct = value <= 1 ? value * 100 : value;
+  return `${pct.toFixed(1)}%`;
 }

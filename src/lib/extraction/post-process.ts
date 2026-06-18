@@ -26,12 +26,14 @@ function parseInteger(value: string | null | undefined): number | null {
   return parsed == null ? null : Math.round(parsed);
 }
 
-function parsePercent(value: string | null | undefined): number | null {
+/** Store percentage stats as points (67.2% -> 67.2). */
+function parsePercentagePoints(value: string | null | undefined): number | null {
   if (value == null) return null;
   const trimmed = value.trim().replace(/%$/, "");
   const parsed = parseDecimal(trimmed);
   if (parsed == null) return null;
-  return parsed > 1 ? parsed / 100 : parsed;
+  if (trimmed.includes("%") || parsed > 1) return parsed;
+  return parsed * 100;
 }
 
 function isNameHeader(header: string): boolean {
@@ -69,8 +71,9 @@ const BATTING_HEADERS: Record<string, keyof BattingRow> = {
 
 const PITCHING_HEADERS: Record<string, keyof PitchingRow> = {
   IP: "innings_pitched",
-  P: "pitches",
-  S: "pitches",
+  BF: "batters_faced",
+  P: "total_pitches",
+  S: "strikes",
   "S%": "strike_percentage",
   SPCT: "strike_percentage",
   FPS: "first_pitch_strike_pct",
@@ -82,9 +85,21 @@ const PITCHING_HEADERS: Record<string, keyof PitchingRow> = {
   H: "hits_allowed",
   R: "runs_allowed",
   ER: "runs_allowed",
-  BF: "batters_faced",
-  WHIP: "whip",
-  BAA: "batting_avg_against",
+  BAA: "baa",
+  "K/BB": "k_bb_ratio",
+  KBB: "k_bb_ratio",
+  "BB/INN": "walks_per_inning",
+  BBINN: "walks_per_inning",
+  "P/IP": "pitches_per_inning",
+  PIP: "pitches_per_inning",
+  "P/BF": "pitches_per_batter_faced",
+  PBF: "pitches_per_batter_faced",
+  "123INN": "one_two_three_innings",
+  LOO: "leadoff_outs",
+  "SM%": "swing_miss_pct",
+  SMPCT: "swing_miss_pct",
+  BABIP: "babip",
+  FIP: "fip",
 };
 
 function scoreHeaders(headers: string[], map: Record<string, string>): number {
@@ -193,6 +208,9 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
       jersey_number: null,
       innings_pitched: null,
       pitches: null,
+      total_pitches: null,
+      batters_faced: null,
+      strikes: null,
       strike_percentage: null,
       first_pitch_strike_pct: null,
       era: null,
@@ -200,9 +218,16 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
       strikeouts: null,
       hits_allowed: null,
       runs_allowed: null,
-      batters_faced: null,
-      whip: null,
-      batting_avg_against: null,
+      k_bb_ratio: null,
+      walks_per_inning: null,
+      pitches_per_inning: null,
+      pitches_per_batter_faced: null,
+      one_two_three_innings: null,
+      leadoff_outs: null,
+      swing_miss_pct: null,
+      baa: null,
+      babip: null,
+      fip: null,
       confidence: 0.85,
     };
 
@@ -215,40 +240,34 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
 
       switch (field) {
         case "innings_pitched":
-          stat.innings_pitched = parseDecimal(raw);
+        case "era":
+        case "k_bb_ratio":
+        case "walks_per_inning":
+        case "pitches_per_inning":
+        case "pitches_per_batter_faced":
+        case "baa":
+        case "babip":
+        case "fip":
+          stat[field] = parseDecimal(raw) as never;
           break;
-        case "pitches":
-          stat.pitches = parseInteger(raw);
+        case "total_pitches":
+          stat.total_pitches = parseInteger(raw);
+          stat.pitches = stat.total_pitches;
+          break;
+        case "strikes":
+        case "batters_faced":
+        case "walks":
+        case "strikeouts":
+        case "hits_allowed":
+        case "runs_allowed":
+        case "one_two_three_innings":
+        case "leadoff_outs":
+          stat[field] = parseInteger(raw) as never;
           break;
         case "strike_percentage":
-          stat.strike_percentage = parsePercent(raw);
-          break;
-        case "era":
-          stat.era = parseDecimal(raw);
-          break;
-        case "walks":
-          stat.walks = parseInteger(raw);
-          break;
-        case "strikeouts":
-          stat.strikeouts = parseInteger(raw);
-          break;
-        case "hits_allowed":
-          stat.hits_allowed = parseInteger(raw);
-          break;
-        case "runs_allowed":
-          stat.runs_allowed = parseInteger(raw);
-          break;
         case "first_pitch_strike_pct":
-          stat.first_pitch_strike_pct = parsePercent(raw);
-          break;
-        case "batters_faced":
-          stat.batters_faced = parseInteger(raw);
-          break;
-        case "whip":
-          stat.whip = parseDecimal(raw);
-          break;
-        case "batting_avg_against":
-          stat.batting_avg_against = parseDecimal(raw);
+        case "swing_miss_pct":
+          stat[field] = parsePercentagePoints(raw) as never;
           break;
       }
       filled += 1;
@@ -314,6 +333,31 @@ function mergeBattingStats(
   return merged;
 }
 
+const PITCHING_MERGE_FIELDS: (keyof PitchingRow)[] = [
+  "innings_pitched",
+  "pitches",
+  "total_pitches",
+  "batters_faced",
+  "strikes",
+  "strike_percentage",
+  "first_pitch_strike_pct",
+  "era",
+  "walks",
+  "strikeouts",
+  "hits_allowed",
+  "runs_allowed",
+  "k_bb_ratio",
+  "walks_per_inning",
+  "pitches_per_inning",
+  "pitches_per_batter_faced",
+  "one_two_three_innings",
+  "leadoff_outs",
+  "swing_miss_pct",
+  "baa",
+  "babip",
+  "fip",
+];
+
 function mergePitchingStats(
   primary: PitchingRow[],
   secondary: PitchingRow[]
@@ -324,30 +368,24 @@ function mergePitchingStats(
     const existing = merged.find((item) => rowsMatchPlayer(item, row));
 
     if (existing) {
-      if (existing.innings_pitched == null && row.innings_pitched != null) {
-        existing.innings_pitched = row.innings_pitched;
+      for (const field of PITCHING_MERGE_FIELDS) {
+        const incoming = row[field];
+        if (incoming == null) continue;
+        if (existing[field] == null) {
+          (existing as Record<string, unknown>)[field] = incoming;
+        }
       }
-      if (existing.pitches == null && row.pitches != null) {
-        existing.pitches = row.pitches;
-      }
-      if (existing.strike_percentage == null && row.strike_percentage != null) {
-        existing.strike_percentage = row.strike_percentage;
-      }
-      if (existing.era == null && row.era != null) existing.era = row.era;
-      if (existing.walks == null && row.walks != null) existing.walks = row.walks;
-      if (existing.strikeouts == null && row.strikeouts != null) {
-        existing.strikeouts = row.strikeouts;
-      }
-      if (existing.hits_allowed == null && row.hits_allowed != null) {
-        existing.hits_allowed = row.hits_allowed;
-      }
-      if (existing.runs_allowed == null && row.runs_allowed != null) {
-        existing.runs_allowed = row.runs_allowed;
+      if (existing.total_pitches != null) {
+        existing.pitches = existing.total_pitches;
+      } else if (existing.pitches != null) {
+        existing.total_pitches = existing.pitches;
       }
       if (!hasNumericStatValues(existing) && hasNumericStatValues(row)) {
         Object.assign(existing, row);
       }
     } else if (hasNumericStatValues(row)) {
+      if (row.total_pitches != null) row.pitches = row.total_pitches;
+      else if (row.pitches != null) row.total_pitches = row.pitches;
       merged.push(row);
     }
   }
