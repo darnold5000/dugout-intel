@@ -160,6 +160,93 @@ export interface ScoutingReportJson {
   suggested_game_plan: string;
   confidence_level: string;
   unknowns_data_gaps: string[];
+  /** Dugout Intel 2.0 structured sections */
+  team_identity?: TeamIdentity;
+  confidence_by_category?: ConfidenceByCategory;
+  offensive_leaders?: LeaderEntry[];
+  pitching_leaders?: PitchingLeaders;
+  player_scouting_cards?: PlayerScoutingCard[];
+  base_running_threats?: LeaderEntry[];
+  lineup_threat_tiers?: ThreatTierGroup;
+  pitching_hierarchy?: PitchingTierGroup;
+  first_pitch_strike_analysis?: FirstPitchAnalysis;
+  pitch_count_leaders?: LeaderEntry[];
+  players_to_attack?: string[];
+  players_to_avoid?: string[];
+}
+
+export interface LeaderEntry {
+  label: string;
+  jersey_number: string | null;
+  player_name: string;
+  stat_line: string;
+  interpretation?: string;
+}
+
+export interface PitchingLeaders {
+  ace_pitcher: LeaderEntry | null;
+  strike_thrower: LeaderEntry | null;
+  swing_and_miss: LeaderEntry | null;
+  control_problems: LeaderEntry | null;
+  contact_pitcher: LeaderEntry | null;
+}
+
+export interface PlayerScoutingCard {
+  jersey_number: string | null;
+  player_name: string;
+  key_stats: string;
+  assessment: string;
+  game_plan: string;
+  role: "hitter" | "pitcher" | "two-way";
+}
+
+export interface ThreatTierGroup {
+  tier_1: string[];
+  tier_2: string[];
+  tier_3: string[];
+}
+
+export interface PitchingTierGroup {
+  tier_1: string[];
+  tier_2: string[];
+  tier_3: string[];
+}
+
+export interface FirstPitchAnalysis {
+  gets_ahead: LeaderEntry[];
+  falls_behind: LeaderEntry[];
+}
+
+export interface TeamIdentity {
+  offensive_strength: string;
+  power: string;
+  speed: string;
+  patience: string;
+  pitching_depth: string;
+}
+
+export interface ConfidenceByCategory {
+  offense: string;
+  pitching: string;
+  baserunning: string;
+  defense: string;
+}
+
+export interface TeamIntelligence {
+  profiles: import("@/lib/scouting/player-profiles").PlayerProfile[];
+  offensiveLeaders: Record<string, LeaderEntry | null>;
+  pitchingLeaders: PitchingLeaders;
+  baseRunningThreats: LeaderEntry[];
+  lineupThreatTiers: ThreatTierGroup;
+  pitchingHierarchy: PitchingTierGroup;
+  firstPitchAnalysis: FirstPitchAnalysis;
+  pitchCountLeaders: LeaderEntry[];
+  teamIdentity: TeamIdentity;
+  confidenceByCategory: ConfidenceByCategory;
+  playerScoutingCards: PlayerScoutingCard[];
+  playersToAttack: PlayerScoutingCard[];
+  playersToAvoid: PlayerScoutingCard[];
+  dataGaps: string[];
 }
 
 export interface AIExtractionResult {
@@ -192,11 +279,15 @@ export interface AIExtractionResult {
     innings_pitched: number | null;
     pitches: number | null;
     strike_percentage: number | null;
+    first_pitch_strike_pct?: number | null;
     era: number | null;
     walks: number | null;
     strikeouts: number | null;
     hits_allowed: number | null;
     runs_allowed: number | null;
+    batters_faced?: number | null;
+    whip?: number | null;
+    batting_avg_against?: number | null;
     confidence: number;
   }[];
   games: {

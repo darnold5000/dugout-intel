@@ -1,6 +1,7 @@
 import {
-  getConsolidationKey,
+  buildCanonicalKeyMap,
   parsePlayerIdentity,
+  resolveConsolidationKey,
 } from "@/lib/extraction/player-identity";
 import type {
   ExtractedBattingStat,
@@ -68,13 +69,26 @@ export function buildPlayerProfiles(data: OpponentDetail): PlayerProfile[] {
   );
   const hasScreenshotWarnings = conflictWarnings.size > 0;
 
+  const identityEntries = [
+    ...data.extracted_players.map((p) => ({ name: p.name, jersey: p.jersey_number })),
+    ...data.extracted_batting_stats.map((s) => ({
+      name: s.player_name,
+      jersey: s.jersey_number,
+    })),
+    ...data.extracted_pitching_stats.map((s) => ({
+      name: s.player_name,
+      jersey: s.jersey_number,
+    })),
+  ];
+  const canonicalMap = buildCanonicalKeyMap(identityEntries);
+
   const profileMap = new Map<string, PlayerProfile>();
 
   const ensureProfile = (
     name: string | null,
     jersey: string | null
   ): PlayerProfile | null => {
-    const key = getConsolidationKey(name, jersey);
+    const key = resolveConsolidationKey(name, jersey, canonicalMap);
     if (!key) return null;
 
     const parsed = parsePlayerIdentity(name, jersey);
@@ -176,15 +190,16 @@ export function buildScoutingInsights(profiles: PlayerProfile[]): ScoutingInsigh
     .slice(0, 5);
   const pitchersToKnow = sortByDesc(withPitching, (p) => p.pitching?.innings_pitched ?? null).slice(0, 5);
 
-  const weakSpots = withBatting
-    .filter((p) => {
+  const weakSpots = sortByDesc(
+    withBatting.filter((p) => {
       const b = p.batting!;
       const lowAvg = b.avg != null && b.avg < 0.2;
       const lowObp = b.obp != null && b.obp < 0.3;
       const highSo = b.strikeouts != null && b.strikeouts >= 5;
       return lowAvg || lowObp || highSo;
-    })
-    .slice(0, 5);
+    }),
+    (p) => p.batting?.strikeouts ?? 0
+  ).slice(0, 5);
 
   return {
     topHitters,

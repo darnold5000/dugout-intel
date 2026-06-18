@@ -6,5 +6,5 @@ export default async function ReportRedirect({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/opponents/${id}?tab=reports`);
+  redirect(`/opponents/${id}?tab=report`);
 }

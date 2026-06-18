@@ -3,6 +3,7 @@ import type {
   RawExtractedTable,
   ScreenshotType,
 } from "@/types";
+import { parsePlayerIdentity } from "@/lib/extraction/player-identity";
 
 type BattingRow = AIExtractionResult["batting_stats"][number];
 type PitchingRow = AIExtractionResult["pitching_stats"][number];
@@ -72,6 +73,8 @@ const PITCHING_HEADERS: Record<string, keyof PitchingRow> = {
   S: "pitches",
   "S%": "strike_percentage",
   SPCT: "strike_percentage",
+  FPS: "first_pitch_strike_pct",
+  "FPS%": "first_pitch_strike_pct",
   ERA: "era",
   BB: "walks",
   SO: "strikeouts",
@@ -79,6 +82,9 @@ const PITCHING_HEADERS: Record<string, keyof PitchingRow> = {
   H: "hits_allowed",
   R: "runs_allowed",
   ER: "runs_allowed",
+  BF: "batters_faced",
+  WHIP: "whip",
+  BAA: "batting_avg_against",
 };
 
 function scoreHeaders(headers: string[], map: Record<string, string>): number {
@@ -188,11 +194,15 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
       innings_pitched: null,
       pitches: null,
       strike_percentage: null,
+      first_pitch_strike_pct: null,
       era: null,
       walks: null,
       strikeouts: null,
       hits_allowed: null,
       runs_allowed: null,
+      batters_faced: null,
+      whip: null,
+      batting_avg_against: null,
       confidence: 0.85,
     };
 
@@ -228,6 +238,18 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
         case "runs_allowed":
           stat.runs_allowed = parseInteger(raw);
           break;
+        case "first_pitch_strike_pct":
+          stat.first_pitch_strike_pct = parsePercent(raw);
+          break;
+        case "batters_faced":
+          stat.batters_faced = parseInteger(raw);
+          break;
+        case "whip":
+          stat.whip = parseDecimal(raw);
+          break;
+        case "batting_avg_against":
+          stat.batting_avg_against = parseDecimal(raw);
+          break;
       }
       filled += 1;
     });
@@ -238,6 +260,15 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
   }
 
   return stats;
+}
+
+function rowsMatchPlayer(
+  a: { player_name: string | null; jersey_number?: string | null },
+  b: { player_name: string | null; jersey_number?: string | null }
+): boolean {
+  const nameA = parsePlayerIdentity(a.player_name, a.jersey_number ?? null).player_name?.toLowerCase();
+  const nameB = parsePlayerIdentity(b.player_name, b.jersey_number ?? null).player_name?.toLowerCase();
+  return nameA === nameB && !!nameA;
 }
 
 function hasNumericStatValues(row: BattingRow | PitchingRow): boolean {
@@ -256,12 +287,7 @@ function mergeBattingStats(
   const merged = [...primary];
 
   for (const row of secondary) {
-    const existing = merged.find(
-      (item) =>
-        item.player_name &&
-        row.player_name &&
-        item.player_name.toLowerCase() === row.player_name.toLowerCase()
-    );
+    const existing = merged.find((item) => rowsMatchPlayer(item, row));
 
     if (existing) {
       if (existing.avg == null && row.avg != null) existing.avg = row.avg;
@@ -295,12 +321,7 @@ function mergePitchingStats(
   const merged = [...primary];
 
   for (const row of secondary) {
-    const existing = merged.find(
-      (item) =>
-        item.player_name &&
-        row.player_name &&
-        item.player_name.toLowerCase() === row.player_name.toLowerCase()
-    );
+    const existing = merged.find((item) => rowsMatchPlayer(item, row));
 
     if (existing) {
       if (existing.innings_pitched == null && row.innings_pitched != null) {

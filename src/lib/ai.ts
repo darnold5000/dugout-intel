@@ -1,6 +1,11 @@
 import OpenAI from "openai";
 import { enrichExtractionResult } from "@/lib/extraction/post-process";
-import type { AIExtractionResult, ScoutingReportJson } from "@/types";
+import {
+  buildTeamIntelligence,
+  formatIntelligenceReportText,
+  intelligenceToReportJson,
+} from "@/lib/scouting/team-intelligence";
+import type { AIExtractionResult, OpponentDetail, ScoutingReportJson } from "@/types";
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) {
@@ -51,8 +56,13 @@ Map these into batting_stats when visible:
 - SO or K -> strikeouts
 - SB -> stolen_bases
 
-GAMECHANGER PITCHING COLUMNS TO RECOGNIZE:
-IP, BF, P, S, S%, H, R, ER, BB, SO, ERA, WHIP
+GAMECHANGER PITCHING ADVANCED COLUMNS:
+FPS%, S%, K/BB, BB/INN, P/IP, P/BF, 123INN, LOO, SM%, FIP, BABIP
+
+Map FPS% -> first_pitch_strike_pct (as decimal)
+Map BF -> batters_faced
+Map WHIP -> whip
+Map BAA -> batting_avg_against
 
 Map these into pitching_stats when visible:
 - IP -> innings_pitched
@@ -84,20 +94,16 @@ Return ONLY valid JSON matching this schema:
   "unknowns": string[]
 }`;
 
-const REPORT_SYSTEM_PROMPT = `You are a youth baseball scouting assistant writing reports for coaches of 9U-12U travel ball teams.
+const REPORT_NARRATIVE_PROMPT = `You are a youth baseball scouting assistant writing reports for coaches of 9U-12U travel ball teams.
 
-Write in plain English, coach-friendly tone. Be practical and actionable. Do not invent stats not provided in the data.
+You will receive PRE-COMPUTED scouting intelligence with verified stats and player rankings. Your job is to write compelling narrative prose that references specific players and stats from the data. Do NOT invent stats. Do NOT contradict the structured intelligence.
 
-Return ONLY valid JSON matching this schema:
+Return ONLY valid JSON:
 {
-  "opponent_summary": string,
-  "offensive_tendencies": string,
-  "pitching_notes": string,
-  "players_to_watch": string[],
-  "weaknesses_opportunities": string,
-  "suggested_game_plan": string,
-  "confidence_level": string,
-  "unknowns_data_gaps": string[]
+  "opponent_summary": string (2-3 sentences, coach-friendly),
+  "offensive_tendencies": string (specific players and stats),
+  "pitching_notes": string (specific pitchers, IP, FPS% if available),
+  "suggested_game_plan": string (actionable pre-game plan in 3-5 bullet points as prose)
 }`;
 
 export async function extractFromScreenshot(
@@ -155,78 +161,68 @@ export async function extractFromScreenshot(
 export async function generateScoutingReport(data: {
   opponentName: string;
   ageLevel: string;
-  players: unknown[];
-  battingStats: unknown[];
-  pitchingStats: unknown[];
-  games: unknown[];
+  opponentDetail: OpponentDetail;
 }): Promise<{ reportJson: ScoutingReportJson; reportText: string }> {
-  let response;
+  const intelligence = buildTeamIntelligence(data.opponentDetail);
+
+  let aiNarrative: Partial<{
+    opponent_summary: string;
+    offensive_tendencies: string;
+    pitching_notes: string;
+    suggested_game_plan: string;
+  }> = {};
+
   try {
-    response = await getOpenAI().chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: REPORT_SYSTEM_PROMPT },
+        { role: "system", content: REPORT_NARRATIVE_PROMPT },
         {
           role: "user",
-          content: `Generate a scouting report for opponent "${data.opponentName}" (${data.ageLevel}).
+          content: `Write narrative sections for opponent "${data.opponentName}" (${data.ageLevel}).
 
-Extracted data:
-${JSON.stringify(data, null, 2)}
-
-Write practical advice for a youth baseball coach preparing to play this team.`,
+Structured scouting intelligence (use these facts, cite player names):
+${JSON.stringify(
+  {
+    team_identity: intelligence.teamIdentity,
+    offensive_leaders: intelligence.offensiveLeaders,
+    pitching_leaders: intelligence.pitchingLeaders,
+    base_running_threats: intelligence.baseRunningThreats,
+    lineup_tiers: intelligence.lineupThreatTiers,
+    pitching_hierarchy: intelligence.pitchingHierarchy,
+    player_cards: intelligence.playerScoutingCards,
+    players_to_attack: intelligence.playersToAttack.map((p) => p.player_name),
+    players_to_avoid: intelligence.playersToAvoid.map((p) => p.player_name),
+  },
+  null,
+  2
+)}`,
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 4096,
+      max_tokens: 2048,
     });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "OpenAI request failed";
-    throw new Error(`OpenAI error: ${message}`);
+
+    const content = response.choices[0]?.message?.content;
+    if (content) {
+      aiNarrative = JSON.parse(content) as typeof aiNarrative;
+    }
+  } catch {
+    // Fall back to rule-based narratives if AI unavailable
   }
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("No report response from AI");
-
-  const reportJson = JSON.parse(content) as ScoutingReportJson;
-  const reportText = formatReportText(data.opponentName, reportJson);
+  const reportJson = intelligenceToReportJson(intelligence, aiNarrative);
+  const reportText = formatIntelligenceReportText(data.opponentName, reportJson);
 
   return { reportJson, reportText };
 }
 
+/** @deprecated Use formatIntelligenceReportText via generateScoutingReport */
 function formatReportText(
   opponentName: string,
   report: ScoutingReportJson
 ): string {
-  const sections = [
-    `# Scouting Report: ${opponentName}`,
-    "",
-    "## Opponent Summary",
-    report.opponent_summary,
-    "",
-    "## Offensive Tendencies",
-    report.offensive_tendencies,
-    "",
-    "## Pitching Notes",
-    report.pitching_notes,
-    "",
-    "## Players to Watch",
-    ...report.players_to_watch.map((p) => `- ${p}`),
-    "",
-    "## Weaknesses / Opportunities",
-    report.weaknesses_opportunities,
-    "",
-    "## Suggested Game Plan",
-    report.suggested_game_plan,
-    "",
-    "## Confidence Level",
-    report.confidence_level,
-    "",
-    "## Unknowns / Data Gaps",
-    ...report.unknowns_data_gaps.map((u) => `- ${u}`),
-  ];
-
-  return sections.join("\n");
+  return formatIntelligenceReportText(opponentName, report);
 }
 
 export async function fileToDataUrl(

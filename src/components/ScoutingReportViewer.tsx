@@ -3,11 +3,51 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Printer } from "lucide-react";
 import type { ScoutingReport, ScoutingReportJson } from "@/types";
 
 interface ScoutingReportViewerProps {
   report: ScoutingReport;
+}
+
+function LeaderList({
+  title,
+  entries,
+}: {
+  title: string;
+  entries: Array<{
+    label: string;
+    jersey_number: string | null;
+    player_name: string;
+    stat_line: string;
+    interpretation?: string;
+  }>;
+}) {
+  if (!entries.length) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {entries.map((entry, i) => (
+          <div key={i} className="text-sm">
+            <p className="font-medium">
+              {entry.jersey_number ? `#${entry.jersey_number} ` : ""}
+              {entry.player_name}
+            </p>
+            <p className="text-muted-foreground">{entry.stat_line}</p>
+            {entry.interpretation && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {entry.interpretation}
+              </p>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
@@ -48,6 +88,179 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
         </CardContent>
       </Card>
 
+      {data.team_identity && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Team Identity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{data.team_identity.offensive_strength}</Badge>
+              <Badge variant="outline">Power: {data.team_identity.power}</Badge>
+              <Badge variant="outline">Speed: {data.team_identity.speed}</Badge>
+              <Badge variant="outline">Patience: {data.team_identity.patience}</Badge>
+              <Badge variant="outline">{data.team_identity.pitching_depth}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.confidence_by_category && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Confidence by Category</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground text-xs">Offense</p>
+              <p className="font-medium">{data.confidence_by_category.offense}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Pitching</p>
+              <p className="font-medium">{data.confidence_by_category.pitching}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Baserunning</p>
+              <p className="font-medium">{data.confidence_by_category.baserunning}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Defense</p>
+              <p className="font-medium">{data.confidence_by_category.defense}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.offensive_leaders && data.offensive_leaders.length > 0 && (
+        <LeaderList title="Offensive Leaders" entries={data.offensive_leaders} />
+      )}
+
+      {data.pitching_leaders && (
+        <LeaderList
+          title="Pitching Leaders"
+          entries={
+            Object.values(data.pitching_leaders).filter(
+              (e): e is NonNullable<typeof e> => e != null
+            )
+          }
+        />
+      )}
+
+      {data.player_scouting_cards && data.player_scouting_cards.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Players to Watch</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {data.player_scouting_cards.map((card, i) => (
+              <div key={i} className="border-b last:border-0 pb-4 last:pb-0">
+                <h4 className="font-semibold text-sm">
+                  {card.jersey_number ? `#${card.jersey_number} ` : ""}
+                  {card.player_name}
+                </h4>
+                <pre className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap font-sans">
+                  {card.key_stats}
+                </pre>
+                <p className="text-sm mt-2">
+                  <span className="font-medium">Assessment: </span>
+                  {card.assessment}
+                </p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Game Plan: </span>
+                  {card.game_plan}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Players to Watch</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              {data.players_to_watch.map((player, i) => (
+                <li key={i} className="whitespace-pre-wrap">
+                  {player}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.base_running_threats && data.base_running_threats.length > 0 && (
+        <LeaderList title="Base Running Threats" entries={data.base_running_threats} />
+      )}
+
+      {data.lineup_threat_tiers && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Lineup Threat Tiers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {data.lineup_threat_tiers.tier_1.length > 0 && (
+              <p>
+                <span className="font-medium">Tier 1: </span>
+                {data.lineup_threat_tiers.tier_1.join(", ")}
+              </p>
+            )}
+            {data.lineup_threat_tiers.tier_2.length > 0 && (
+              <p>
+                <span className="font-medium">Tier 2: </span>
+                {data.lineup_threat_tiers.tier_2.join(", ")}
+              </p>
+            )}
+            {data.lineup_threat_tiers.tier_3.length > 0 && (
+              <p className="text-muted-foreground">
+                <span className="font-medium">Tier 3: </span>
+                {data.lineup_threat_tiers.tier_3.join(", ")}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {data.pitching_hierarchy && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Pitching Hierarchy</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p>
+              <span className="font-medium">Tier 1: </span>
+              {data.pitching_hierarchy.tier_1.join(", ") || "None identified"}
+            </p>
+            <p>
+              <span className="font-medium">Tier 2: </span>
+              {data.pitching_hierarchy.tier_2.join(", ") || "None"}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-medium">Tier 3: </span>
+              {data.pitching_hierarchy.tier_3.join(", ") || "None"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.first_pitch_strike_analysis && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <LeaderList
+            title="Pitchers Who Get Ahead"
+            entries={data.first_pitch_strike_analysis.gets_ahead}
+          />
+          <LeaderList
+            title="Pitchers Who Fall Behind"
+            entries={data.first_pitch_strike_analysis.falls_behind}
+          />
+        </div>
+      )}
+
+      {data.pitch_count_leaders && data.pitch_count_leaders.length > 0 && (
+        <LeaderList title="Pitch Count Leaders" entries={data.pitch_count_leaders} />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Offensive Tendencies</CardTitle>
@@ -68,25 +281,22 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Players to Watch</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc list-inside space-y-1 text-sm">
-            {data.players_to_watch.map((player, i) => (
-              <li key={i}>{player}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Weaknesses / Opportunities</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm leading-relaxed">
             {data.weaknesses_opportunities}
           </p>
+          {data.players_to_attack && data.players_to_attack.length > 0 && (
+            <p className="text-sm mt-2 text-muted-foreground">
+              Attack: {data.players_to_attack.join(", ")}
+            </p>
+          )}
+          {data.players_to_avoid && data.players_to_avoid.length > 0 && (
+            <p className="text-sm mt-1 text-muted-foreground">
+              Avoid: {data.players_to_avoid.join(", ")}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -99,19 +309,10 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Confidence Level</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm leading-relaxed">{data.confidence_level}</p>
-        </CardContent>
-      </Card>
-
       {data.unknowns_data_gaps.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Unknowns / Data Gaps</CardTitle>
+            <CardTitle>Data Gaps</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">

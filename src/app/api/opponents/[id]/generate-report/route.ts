@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseFromRequest } from "@/lib/supabase/request";
 import { generateScoutingReport } from "@/lib/ai";
+import type { OpponentDetail } from "@/types";
 
 export async function POST(
   request: Request,
@@ -34,15 +35,27 @@ export async function POST(
   }
 
   const [
+    { data: screenshot_uploads },
     { data: players },
     { data: battingStats },
     { data: pitchingStats },
     { data: games },
+    { data: scouting_reports },
   ] = await Promise.all([
+    supabase
+      .from("screenshot_uploads")
+      .select("*")
+      .eq("opponent_id", opponentId)
+      .order("created_at", { ascending: false }),
     supabase.from("extracted_players").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_batting_stats").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_pitching_stats").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_games").select("*").eq("opponent_id", opponentId),
+    supabase
+      .from("scouting_reports")
+      .select("*")
+      .eq("opponent_id", opponentId)
+      .order("created_at", { ascending: false }),
   ]);
 
   const hasData =
@@ -58,14 +71,21 @@ export async function POST(
     );
   }
 
+  const opponentDetail: OpponentDetail = {
+    ...opponent,
+    screenshot_uploads: screenshot_uploads ?? [],
+    extracted_players: players ?? [],
+    extracted_batting_stats: battingStats ?? [],
+    extracted_pitching_stats: pitchingStats ?? [],
+    extracted_games: games ?? [],
+    scouting_reports: scouting_reports ?? [],
+  };
+
   try {
     const { reportJson, reportText } = await generateScoutingReport({
       opponentName: opponent.name,
       ageLevel: opponent.age_level,
-      players: players ?? [],
-      battingStats: battingStats ?? [],
-      pitchingStats: pitchingStats ?? [],
-      games: games ?? [],
+      opponentDetail,
     });
 
     const { data: report, error: saveError } = await supabase

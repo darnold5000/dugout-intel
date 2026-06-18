@@ -21,7 +21,22 @@ import { getAuthHeaders } from "@/lib/auth-headers";
 import type { ExtractionResult, ExtractionSummary, ScreenshotUpload } from "@/types";
 import { Eye, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 
-interface ScreenshotsTabProps {
+function extractionQualityBadge(upload: ScreenshotUpload): {
+  label: string;
+  variant: "success" | "warning" | "outline";
+} {
+  if (upload.extraction_status === "failed") {
+    return { label: "Extraction Failed", variant: "warning" };
+  }
+  if (upload.extraction_status !== "complete") {
+    return { label: "Pending", variant: "outline" };
+  }
+  const warnings = upload.extraction_warnings?.length ?? 0;
+  if (warnings > 0) {
+    return { label: "Missing Columns", variant: "warning" };
+  }
+  return { label: "High Confidence", variant: "success" };
+}
   opponentId: string;
   opponentName: string;
   uploads: ScreenshotUpload[];
@@ -180,6 +195,7 @@ export function ScreenshotsTab({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {uploads.map((upload) => {
               const warningCount = upload.extraction_warnings?.length ?? 0;
+              const quality = extractionQualityBadge(upload);
 
               return (
                 <Card key={upload.id} className="overflow-hidden">
@@ -205,6 +221,10 @@ export function ScreenshotsTab({
                         </Badge>
                       )}
                     </div>
+                    <Badge variant={quality.variant} className="text-[10px] w-fit">
+                      {quality.variant === "success" ? "✓ " : quality.variant === "warning" ? "⚠ " : ""}
+                      {quality.label}
+                    </Badge>
                     {warningCount > 0 && (
                       <button
                         type="button"

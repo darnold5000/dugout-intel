@@ -31,34 +31,68 @@ function stripHash(value: string): string {
   return value.replace(/^#+/, "").trim();
 }
 
+/** Normalize display name: strip periods, collapse spaces, lowercase for matching. */
+export function normalizePlayerName(name: string): string {
+  return normalizeSpaces(name.replace(/\./g, "")).toLowerCase();
+}
+
 /** Extract jersey number embedded in a player name string. */
 function extractJerseyFromName(name: string): {
   cleanName: string;
   jersey: string | null;
   unparsed: boolean;
 } {
-  const cleanName = normalizeSpaces(name.replace(/,/g, " ").trim());
+  let working = normalizeSpaces(name.replace(/,/g, " ").trim());
 
   const patterns: RegExp[] = [
     /^#\s*(\d{1,3})\s+(.+)$/i,
     /^(.+?)\s*\(\s*#?\s*(\d{1,3})\s*\)\s*$/,
     /^(.+?)\s*#\s*(\d{1,3})\s*$/,
-    /^(.+?)\s+(\d{1,2})$/,
+    /^(.+?)\s+(\d{1,3})$/,
+    /^(.+?),\s*#?\s*(\d{1,3})\s*$/,
   ];
 
   for (const pattern of patterns) {
-    const match = cleanName.match(pattern);
+    const match = working.match(pattern);
     if (!match) continue;
     const [, first, second] = match;
     if (pattern.source.startsWith("^#")) {
-      return { cleanName: normalizeSpaces(second), jersey: stripHash(first), unparsed: false };
+      return {
+        cleanName: normalizeSpaces(second),
+        jersey: stripHash(first),
+        unparsed: false,
+      };
     }
-    return { cleanName: normalizeSpaces(first), jersey: stripHash(second), unparsed: false };
+    return {
+      cleanName: normalizeSpaces(first),
+      jersey: stripHash(second),
+      unparsed: false,
+    };
+  }
+
+  // Handle compact forms like "J Stewart#18" or "J Stewart,18"
+  const compact = working.match(/^(.+?)[,#]\s*#?(\d{1,3})\s*$/);
+  if (compact) {
+    return {
+      cleanName: normalizeSpaces(compact[1]),
+      jersey: stripHash(compact[2]),
+      unparsed: false,
+    };
   }
 
   const unparsed = /,\s*#?\d/.test(name);
 
-  return { cleanName: normalizeSpaces(name.replace(/,/g, "").trim()), jersey: null, unparsed };
+  // Last resort: strip any trailing #NN or , NN from the name
+  const stripped = working
+    .replace(/\s*#\s*\d{1,3}\s*$/, "")
+    .replace(/\s+\d{1,3}\s*$/, "")
+    .trim();
+
+  return {
+    cleanName: normalizeSpaces(stripped || working),
+    jersey: null,
+    unparsed,
+  };
 }
 
 export function parsePlayerIdentity(
@@ -95,7 +129,7 @@ export function parsePlayerIdentity(
     };
   }
 
-  const normalizedName = name ? name.toLowerCase().trim() : null;
+  const normalizedName = name ? normalizePlayerName(name) : null;
 
   let merge_key: string | null = null;
   if (normalizedName && jersey) {
@@ -143,14 +177,68 @@ export function getConsolidationKey(
     return `jersey:${parsed.jersey_number}`;
   }
   if (!parsed.player_name || parsed.merge_key === null) return null;
-  return parsed.player_name.toLowerCase().trim();
+  return normalizePlayerName(parsed.player_name);
+}
+
+/**
+ * Build a map from any raw consolidation key to a canonical key so that
+ * "j stewart", "j stewart|18", and "jersey:18" all resolve to one player.
+ */
+export function buildCanonicalKeyMap(
+  entries: Array<{ name: string | null; jersey: string | null }>
+): Map<string, string> {
+  const canonical = new Map<string, string>();
+  const jerseyToName = new Map<string, string>();
+
+  for (const entry of entries) {
+    const parsed = parsePlayerIdentity(entry.name, entry.jersey);
+    if (!parsed.player_name && !parsed.jersey_number) continue;
+
+    const nameKey = parsed.player_name
+      ? normalizePlayerName(parsed.player_name)
+      : null;
+
+    if (nameKey && parsed.jersey_number) {
+      jerseyToName.set(parsed.jersey_number, nameKey);
+    }
+
+    if (nameKey) {
+      canonical.set(nameKey, nameKey);
+      if (parsed.jersey_number) {
+        canonical.set(`${nameKey}|${parsed.jersey_number}`, nameKey);
+      }
+    }
+    if (parsed.jersey_number) {
+      canonical.set(`jersey:${parsed.jersey_number}`, nameKey ?? `jersey:${parsed.jersey_number}`);
+    }
+  }
+
+  for (const [jersey, nameKey] of jerseyToName) {
+    canonical.set(`jersey:${jersey}`, nameKey);
+    canonical.set(`${nameKey}|${jersey}`, nameKey);
+  }
+
+  return canonical;
+}
+
+export function resolveConsolidationKey(
+  playerName: string | null | undefined,
+  jerseyNumber: string | null | undefined,
+  canonicalMap?: Map<string, string>
+): string | null {
+  const rawKey = getConsolidationKey(playerName, jerseyNumber);
+  if (!rawKey) return null;
+  if (!canonicalMap) return rawKey;
+  return canonicalMap.get(rawKey) ?? rawKey;
 }
 
 export function isExcludedPlayerRow(
   playerName: string | null | undefined
 ): boolean {
   if (!playerName?.trim()) return true;
-  return EXCLUDED_NAMES.has(playerName.trim().toUpperCase());
+  const parsed = parsePlayerIdentity(playerName, null);
+  if (!parsed.player_name) return true;
+  return EXCLUDED_NAMES.has(parsed.player_name.toUpperCase());
 }
 
 export function buildMergeDiagnostic(
@@ -177,6 +265,7 @@ export interface PotentialDuplicate {
 export function findPotentialDuplicates(
   entries: Array<{ name: string | null; jersey: string | null }>
 ): PotentialDuplicate[] {
+  const canonicalMap = buildCanonicalKeyMap(entries);
   const byFirstToken = new Map<string, typeof entries>();
 
   for (const entry of entries) {
@@ -194,7 +283,9 @@ export function findPotentialDuplicates(
   for (const group of byFirstToken.values()) {
     if (group.length < 2) continue;
     const keys = new Set(
-      group.map((e) => getConsolidationKey(e.name, e.jersey)).filter(Boolean)
+      group
+        .map((e) => resolveConsolidationKey(e.name, e.jersey, canonicalMap))
+        .filter(Boolean)
     );
     if (keys.size <= 1) continue;
 
@@ -202,7 +293,7 @@ export function findPotentialDuplicates(
       players: group.map((e) => ({
         name: parsePlayerIdentity(e.name, e.jersey).player_name,
         jersey: parsePlayerIdentity(e.name, e.jersey).jersey_number,
-        key: getConsolidationKey(e.name, e.jersey) ?? "",
+        key: resolveConsolidationKey(e.name, e.jersey, canonicalMap) ?? "",
       })),
       reason: "Similar names with different merge keys — jersey may be missing from one row",
     });

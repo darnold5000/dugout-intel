@@ -77,6 +77,8 @@ export function OpponentWorkspace({
         <ReportsTab
           opponentId={opponentId}
           reports={data.scouting_reports}
+          playerCount={playerCount}
+          screenshotCount={data.screenshot_uploads.length}
           onRefresh={refresh}
         />
       </TabsContent>

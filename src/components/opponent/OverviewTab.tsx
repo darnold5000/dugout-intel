@@ -3,20 +3,18 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
-import { BattingStatsTable } from "@/components/BattingStatsTable";
-import { PitchingStatsTable } from "@/components/PitchingStatsTable";
 import {
   buildPlayerProfiles,
-  buildScoutingInsights,
-  collectDataGaps,
   formatPlayerLabel,
   battingSummary,
   pitchingSummary,
 } from "@/lib/scouting/player-profiles";
+import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
 import { formatDate } from "@/lib/utils";
 import type { OpponentDetail } from "@/types";
-import { Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Sparkles, Trophy } from "lucide-react";
 
 interface OverviewTabProps {
   data: OpponentDetail;
@@ -24,31 +22,21 @@ interface OverviewTabProps {
   onSwitchTab: (tab: string) => void;
 }
 
-function InsightList({
+function LeaderCard({
   title,
-  profiles,
-  renderLine,
+  player,
+  stat,
 }: {
   title: string;
-  profiles: ReturnType<typeof buildPlayerProfiles>;
-  renderLine: (p: (typeof profiles)[number]) => string;
+  player: string;
+  stat: string;
 }) {
-  if (profiles.length === 0) return null;
-
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {profiles.map((profile) => (
-          <div key={profile.key} className="text-sm">
-            <p className="font-medium">{formatPlayerLabel(profile)}</p>
-            <p className="text-muted-foreground text-xs mt-0.5">
-              {renderLine(profile)}
-            </p>
-          </div>
-        ))}
+      <CardContent className="pt-4 pb-4">
+        <p className="text-xs text-muted-foreground">{title}</p>
+        <p className="font-semibold text-sm mt-1 truncate">{player}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{stat}</p>
       </CardContent>
     </Card>
   );
@@ -57,13 +45,10 @@ function InsightList({
 export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) {
   const [showMergeDiagnostics, setShowMergeDiagnostics] = useState(false);
   const [diagMessage, setDiagMessage] = useState("");
+  const [showRawData, setShowRawData] = useState(false);
 
   const profiles = useMemo(() => buildPlayerProfiles(data), [data]);
-  const insights = useMemo(() => buildScoutingInsights(profiles), [profiles]);
-  const dataGaps = useMemo(
-    () => [...insights.dataGaps, ...collectDataGaps(data.screenshot_uploads, profiles)],
-    [insights.dataGaps, data.screenshot_uploads, profiles]
-  );
+  const intelligence = useMemo(() => buildTeamIntelligence(data), [data]);
 
   const lastUpdated = useMemo(() => {
     const dates = data.screenshot_uploads.map((u) => u.created_at);
@@ -78,19 +63,17 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
 
   const hasData = profiles.length > 0 || data.screenshot_uploads.length > 0;
 
+  const topHitter = intelligence.offensiveLeaders.highest_ops ?? intelligence.offensiveLeaders.highest_avg;
+  const topPitcher = intelligence.pitchingLeaders.ace_pitcher;
+  const topRunner = intelligence.offensiveLeaders.most_stolen_bases;
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Players Found</p>
+            <p className="text-xs text-muted-foreground">Players</p>
             <p className="text-2xl font-semibold">{profiles.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Batters</p>
-            <p className="text-2xl font-semibold">{battersWithStats}</p>
           </CardContent>
         </Card>
         <Card>
@@ -111,6 +94,38 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
           </CardContent>
         </Card>
       </div>
+
+      {hasData && (topHitter || topPitcher || topRunner) && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Trophy className="h-4 w-4" />
+            Team Leaders
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {topHitter && (
+              <LeaderCard
+                title="Top Hitter"
+                player={`${topHitter.jersey_number ? `#${topHitter.jersey_number} ` : ""}${topHitter.player_name}`}
+                stat={topHitter.stat_line}
+              />
+            )}
+            {topPitcher && (
+              <LeaderCard
+                title="Top Pitcher"
+                player={`${topPitcher.jersey_number ? `#${topPitcher.jersey_number} ` : ""}${topPitcher.player_name}`}
+                stat={topPitcher.stat_line}
+              />
+            )}
+            {topRunner && (intelligence.baseRunningThreats[0]?.stat_line.includes("SB") ?? false) && (
+              <LeaderCard
+                title="Top Runner"
+                player={`${topRunner.jersey_number ? `#${topRunner.jersey_number} ` : ""}${topRunner.player_name}`}
+                stat={topRunner.stat_line}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Button onClick={() => onSwitchTab("report")} size="lg" className="sm:flex-1">
@@ -153,59 +168,55 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InsightList
-              title="Top Hitters"
-              profiles={insights.topHitters}
-              renderLine={battingSummary}
-            />
-            <InsightList
-              title="On-Base Threats"
-              profiles={insights.onBaseThreats}
-              renderLine={(p) =>
-                p.batting?.obp != null
-                  ? `OBP ${p.batting.obp.toFixed(3)}`
-                  : battingSummary(p)
-              }
-            />
-            <InsightList
-              title="Power / Production"
-              profiles={insights.powerProduction}
-              renderLine={(p) => {
-                const parts: string[] = [];
-                if (p.batting?.ops != null) parts.push(`OPS ${p.batting.ops.toFixed(3)}`);
-                if (p.batting?.rbi != null) parts.push(`RBI ${p.batting.rbi}`);
-                return parts.join(" | ") || battingSummary(p);
-              }}
-            />
-            <InsightList
-              title="Speed Threats"
-              profiles={insights.speedThreats}
-              renderLine={(p) =>
-                p.batting?.stolen_bases != null
-                  ? `${p.batting.stolen_bases} SB`
-                  : battingSummary(p)
-              }
-            />
-            <InsightList
-              title="Pitchers to Know"
-              profiles={insights.pitchersToKnow}
-              renderLine={pitchingSummary}
-            />
-            <InsightList
-              title="Possible Weak Spots"
-              profiles={insights.weakSpots}
-              renderLine={battingSummary}
-            />
-          </div>
+          {intelligence.teamIdentity && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Team Identity</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <Badge variant="outline">{intelligence.teamIdentity.offensive_strength}</Badge>
+                <Badge variant="outline">Power: {intelligence.teamIdentity.power}</Badge>
+                <Badge variant="outline">Speed: {intelligence.teamIdentity.speed}</Badge>
+                <Badge variant="outline">Patience: {intelligence.teamIdentity.patience}</Badge>
+                <Badge variant="outline">{intelligence.teamIdentity.pitching_depth}</Badge>
+              </CardContent>
+            </Card>
+          )}
 
-          {dataGaps.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                Consolidated Players ({profiles.length})
+              </CardTitle>
+              <p className="text-xs text-muted-foreground font-normal">
+                One row per player — duplicates merged across screenshots.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {profiles.map((profile) => (
+                <div
+                  key={profile.key}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 py-2 border-b last:border-0 text-sm"
+                >
+                  <span className="font-medium">{formatPlayerLabel(profile)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {profile.batting ? battingSummary(profile) : ""}
+                    {profile.batting && profile.pitching ? " · " : ""}
+                    {profile.pitching ? pitchingSummary(profile) : ""}
+                    {!profile.batting && !profile.pitching ? "Roster only" : ""}
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {intelligence.dataGaps.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Data Gaps</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1">
-                {dataGaps.map((gap, i) => (
+                {intelligence.dataGaps.map((gap, i) => (
                   <p key={i} className="text-sm text-muted-foreground">
                     • {gap}
                   </p>
@@ -214,29 +225,36 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
             </Card>
           )}
 
-          {data.extracted_batting_stats.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Batting Leaders</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BattingStatsTable stats={data.extracted_batting_stats} />
+          <Card>
+            <CardHeader className="pb-3">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 text-left"
+                onClick={() => setShowRawData((v) => !v)}
+              >
+                {showRawData ? (
+                  <ChevronDown className="h-4 w-4 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0" />
+                )}
+                <CardTitle className="text-base">Raw Screenshot Data</CardTitle>
+                <span className="text-xs text-muted-foreground font-normal ml-auto">
+                  Collapsed by default
+                </span>
+              </button>
+            </CardHeader>
+            {showRawData && (
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  {battersWithStats} batters · {pitchersWithStats} pitchers ·{" "}
+                  {data.extracted_games.length} games in database.
+                </p>
+                <p>
+                  View individual screenshot tables on the Screenshots tab.
+                </p>
               </CardContent>
-            </Card>
-          )}
-
-          {data.extracted_pitching_stats.some(
-            (s) => s.innings_pitched != null
-          ) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Pitching Staff</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PitchingStatsTable stats={data.extracted_pitching_stats} />
-              </CardContent>
-            </Card>
-          )}
+            )}
+          </Card>
         </>
       )}
     </div>

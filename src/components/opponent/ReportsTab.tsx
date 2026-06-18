@@ -45,12 +45,16 @@ const REPORT_TITLES = [
 interface ReportsTabProps {
   opponentId: string;
   reports: ScoutingReport[];
+  playerCount: number;
+  screenshotCount: number;
   onRefresh: () => Promise<void>;
 }
 
 export function ReportsTab({
   opponentId,
   reports,
+  playerCount,
+  screenshotCount,
   onRefresh,
 }: ReportsTabProps) {
   const [generating, setGenerating] = useState(false);
@@ -174,60 +178,30 @@ export function ReportsTab({
 
   return (
     <div className="space-y-6">
-      {displayReport && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="text-lg">Scouting Report</CardTitle>
+      <Card className="border-primary/20">
+        <CardContent className="py-8 text-center space-y-4">
+          <h2 className="text-xl font-semibold">Scouting Report</h2>
+          {latestReport ? (
             <p className="text-sm text-muted-foreground">
-              {displayReport.title ?? "Scouting Report"} ·{" "}
-              {formatDate(displayReport.created_at)}
+              Last Generated: {formatDate(latestReport.created_at)}
             </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ScoutingReportViewer report={displayReport} />
-            <div className="flex flex-wrap gap-2 no-print">
-              <Button onClick={handleGenerate} disabled={generating}>
-                <Sparkles className="h-4 w-4 mr-1" />
-                {generating ? "Generating..." : "Generate New Report"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setFullScreenReport(displayReport)}
-              >
-                <Maximize2 className="h-4 w-4 mr-1" />
-                Open Full Report
-              </Button>
-              <Button variant="outline" onClick={handlePrint}>
-                Print / PDF
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleDownload(displayReport)}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Download
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleShare(displayReport)}
-              >
-                <Share2 className="h-4 w-4 mr-1" />
-                Share
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {reports.length === 0 && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Generate New Report</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Report title</Label>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No report generated yet
+            </p>
+          )}
+          <div className="flex justify-center gap-6 text-sm text-muted-foreground">
+            <span>
+              Players: <strong className="text-foreground">{playerCount}</strong>
+            </span>
+            <span>
+              Screenshots:{" "}
+              <strong className="text-foreground">{screenshotCount}</strong>
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2 max-w-lg mx-auto">
+            <div className="space-y-2 text-left flex-1">
+              <Label className="text-xs">Report title</Label>
               <select
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -240,8 +214,8 @@ export function ReportsTab({
                 ))}
               </select>
             </div>
-            <div className="space-y-2">
-              <Label>Custom title (optional)</Label>
+            <div className="space-y-2 text-left flex-1">
+              <Label className="text-xs">Custom title (optional)</Label>
               <Input
                 placeholder="Override title..."
                 value={customTitle}
@@ -249,50 +223,60 @@ export function ReportsTab({
               />
             </div>
           </div>
-          <Button onClick={handleGenerate} disabled={generating}>
-            <Sparkles className="h-4 w-4 mr-1" />
-            {generating ? "Generating..." : "Generate New Report"}
-          </Button>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+            {latestReport ? (
+              <>
+                <Button size="lg" onClick={() => setFullScreenReport(latestReport)}>
+                  View Report
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {generating ? "Regenerating..." : "Regenerate"}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handleDownload(latestReport)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+                <Button size="lg" variant="outline" onClick={handlePrint}>
+                  Print
+                </Button>
+              </>
+            ) : (
+              <Button size="lg" onClick={handleGenerate} disabled={generating} className="min-w-[200px]">
+                <Sparkles className="h-4 w-4 mr-2" />
+                {generating ? "Generating..." : "Generate Report"}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
-      )}
 
-      {reports.length > 0 && (
-        <Card>
+      {displayReport && (
+        <Card className="border-primary/30 bg-primary/5">
           <CardHeader>
-            <CardTitle className="text-base">New Report Options</CardTitle>
+            <CardTitle className="text-lg">Latest Report Preview</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {displayReport.title ?? "Scouting Report"} ·{" "}
+              {formatDate(displayReport.created_at)}
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Report title</Label>
-                <select
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {REPORT_TITLES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Custom title (optional)</Label>
-                <Input
-                  placeholder="Override title..."
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                />
-              </div>
-            </div>
+            <ScoutingReportViewer report={displayReport} />
           </CardContent>
         </Card>
       )}
 
       {generating && (
-        <LoadingSpinner label="AI is writing your scouting report..." />
+        <LoadingSpinner label="Building scouting intelligence and writing report..." />
       )}
 
       {error && (
@@ -418,7 +402,7 @@ export function ReportsTab({
         </>
       )}
 
-      {reports.length === 0 && !generating && (
+      {reports.length === 0 && !generating && !displayReport && (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">

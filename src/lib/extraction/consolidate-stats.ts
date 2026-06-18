@@ -1,8 +1,9 @@
 import type { AIExtractionResult, RawExtractedTable } from "@/types";
 import {
-  getConsolidationKey,
+  buildCanonicalKeyMap,
   isExcludedPlayerRow,
   parsePlayerIdentity,
+  resolveConsolidationKey,
 } from "@/lib/extraction/player-identity";
 import { enrichExtractionResult } from "@/lib/extraction/post-process";
 
@@ -122,10 +123,28 @@ const PITCHING_FIELDS = [
   "runs_allowed",
 ] as const;
 
+function collectIdentityEntries<T extends { player_name?: string | null; name?: string | null; jersey_number?: string | null }>(
+  rows: SourcedRow<T>[]
+): Array<{ name: string | null; jersey: string | null }> {
+  return rows.map(({ row }) => ({
+    name: row.player_name ?? row.name ?? null,
+    jersey: row.jersey_number ?? null,
+  }));
+}
+
+function consolidationKeyForRow<T extends { player_name?: string | null; name?: string | null; jersey_number?: string | null }>(
+  row: T,
+  canonicalMap: Map<string, string>
+): string | null {
+  const name = row.player_name ?? row.name ?? null;
+  return resolveConsolidationKey(name, row.jersey_number, canonicalMap);
+}
+
 export function mergeBattingStatRows(
   rows: SourcedRow<BattingRow>[],
   warnings: string[] = []
 ): ConsolidatedBattingRow[] {
+  const canonicalMap = buildCanonicalKeyMap(collectIdentityEntries(rows));
   const byKey = new Map<
     string,
     {
@@ -141,7 +160,7 @@ export function mergeBattingStatRows(
     if (!battingHasStats(row)) continue;
 
     const identity = parsePlayerIdentity(row.player_name, row.jersey_number);
-    const key = getConsolidationKey(row.player_name, row.jersey_number);
+    const key = consolidationKeyForRow(row, canonicalMap);
     if (!key) continue;
 
     const meta: FieldMeta = { confidence: row.confidence, order };
@@ -218,6 +237,7 @@ export function mergePitchingStatRows(
   rows: SourcedRow<PitchingRow>[],
   warnings: string[] = []
 ): ConsolidatedPitchingRow[] {
+  const canonicalMap = buildCanonicalKeyMap(collectIdentityEntries(rows));
   const byKey = new Map<
     string,
     {
@@ -233,7 +253,7 @@ export function mergePitchingStatRows(
     if (!pitchingHasStats(row)) continue;
 
     const identity = parsePlayerIdentity(row.player_name, row.jersey_number);
-    const key = getConsolidationKey(row.player_name, row.jersey_number);
+    const key = consolidationKeyForRow(row, canonicalMap);
     if (!key) continue;
 
     const meta: FieldMeta = { confidence: row.confidence, order };
@@ -309,6 +329,7 @@ export function mergePitchingStatRows(
 export function mergePlayerRows(
   rows: SourcedRow<PlayerRow>[]
 ): ConsolidatedPlayerRow[] {
+  const canonicalMap = buildCanonicalKeyMap(collectIdentityEntries(rows));
   const byKey = new Map<
     string,
     {
@@ -322,7 +343,10 @@ export function mergePlayerRows(
     if (isExcludedPlayerRow(row.name)) continue;
 
     const identity = parsePlayerIdentity(row.name, row.jersey_number);
-    const key = getConsolidationKey(row.name, row.jersey_number);
+    const key = consolidationKeyForRow(
+      { name: row.name, jersey_number: row.jersey_number },
+      canonicalMap
+    );
     if (!key) continue;
 
     const existing = byKey.get(key);
