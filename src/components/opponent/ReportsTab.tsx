@@ -13,14 +13,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Dialog as ConfirmDialog,
-  DialogContent as ConfirmDialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader as ConfirmDialogHeader,
-  DialogTitle as ConfirmDialogTitle,
 } from "@/components/ui/dialog";
 import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
 import { getAuthHeaders } from "@/lib/auth-headers";
@@ -46,16 +40,12 @@ const REPORT_TITLES = [
 interface ReportsTabProps {
   opponentId: string;
   reports: ScoutingReport[];
-  playerCount: number;
-  screenshotCount: number;
   onRefresh: () => Promise<void>;
 }
 
 export function ReportsTab({
   opponentId,
   reports,
-  playerCount,
-  screenshotCount,
   onRefresh,
 }: ReportsTabProps) {
   const [generating, setGenerating] = useState(false);
@@ -72,6 +62,8 @@ export function ReportsTab({
   const [copied, setCopied] = useState(false);
 
   const latestReportId = reports[0]?.id;
+  const latestReport = reports[0] ?? null;
+  const displayReport = selectedReport ?? latestReport;
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -176,97 +168,80 @@ export function ReportsTab({
 
   const handlePrint = () => window.print();
 
-  const latestReport = reports[0] ?? null;
-  const displayReport = selectedReport ?? latestReport;
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 no-print">
-        <Button size="sm" onClick={handleGenerate} disabled={generating}>
-          <Sparkles className="h-4 w-4 mr-1" />
-          {generating ? "Generating..." : "Generate Report"}
-        </Button>
-        <RebuildStatsButton
-          opponentId={opponentId}
-          onComplete={onRefresh}
-          size="sm"
-        />
-      </div>
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="text-lg">Generate Scouting Report</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Turn your evidence into a coach-ready scouting report.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+            <div className="space-y-1">
+              <Label className="text-xs">Report title</Label>
+              <select
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {REPORT_TITLES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Custom title (optional)</Label>
+              <Input
+                className="h-9"
+                placeholder="Override title..."
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+              />
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-        <div className="space-y-1">
-          <Label className="text-xs">Report title</Label>
-          <select
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-          >
-            {REPORT_TITLES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Custom title (optional)</Label>
-          <Input
-            className="h-9"
-            placeholder="Override title..."
-            value={customTitle}
-            onChange={(e) => setCustomTitle(e.target.value)}
-          />
-        </div>
-      </div>
+          <div className="flex flex-wrap gap-2 no-print">
+            <Button size="lg" onClick={handleGenerate} disabled={generating}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {generating
+                ? "Generating..."
+                : latestReport
+                  ? "Regenerate Report"
+                  : "Generate Report"}
+            </Button>
+            <RebuildStatsButton
+              opponentId={opponentId}
+              onComplete={onRefresh}
+              size="lg"
+              variant="outline"
+            />
+            {displayReport && (
+              <>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => handleDownload(displayReport)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+                <Button variant="outline" size="lg" onClick={handlePrint}>
+                  Print / PDF
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {reports.length === 0 && !generating && (
         <p className="text-sm text-muted-foreground">
           No reports yet. Add evidence in the Evidence tab, then generate your first scouting report.
         </p>
-      )}
-
-      {displayReport && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="text-lg">Scouting Report</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {displayReport.title ?? "Scouting Report"} ·{" "}
-              {formatDate(displayReport.created_at)}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ScoutingReportViewer report={displayReport} />
-            <div className="flex flex-wrap gap-2 no-print">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFullScreenReport(displayReport)}
-              >
-                <Maximize2 className="h-4 w-4 mr-1" />
-                Open Full Report
-              </Button>
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                Print / PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDownload(displayReport)}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Download
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleShare(displayReport)}
-              >
-                <Share2 className="h-4 w-4 mr-1" />
-                Share
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {generating && (
@@ -286,115 +261,141 @@ export function ReportsTab({
         </div>
       )}
 
-      {reports.length > 0 && (
-        <>
-          <div>
-            <h3 className="font-semibold mb-4">Report History</h3>
-            <div className="space-y-2">
-              {reports.map((report) => {
-                const summary =
-                  (report.report_json as ScoutingReportJson).executive_summary ??
-                  (report.report_json as ScoutingReportJson).opponent_summary;
-                const isLatest = report.id === latestReportId;
-
-                return (
-                  <Card
-                    key={report.id}
-                    className={`cursor-pointer transition-colors ${
-                      selectedReport?.id === report.id
-                        ? "border-primary"
-                        : "hover:border-muted-foreground/30"
-                    }`}
-                    onClick={() => setSelectedReport(report)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium truncate">
-                              {report.title ?? "Scouting Report"}
-                            </h4>
-                            {isLatest && (
-                              <Badge variant="success">Latest</Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-2">
-                            {formatDate(report.created_at)}
-                          </p>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {summary}
-                          </p>
-                        </div>
-                        <div className="flex gap-1 shrink-0 no-print">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFullScreenReport(report);
-                            }}
-                            title="Open full report"
-                          >
-                            <Maximize2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownload(report);
-                            }}
-                            title="Download"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleShare(report);
-                            }}
-                            title="Share link"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEmailShare(report);
-                            }}
-                            title="Email share"
-                          >
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget(report);
-                            }}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+      {displayReport && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">
+              {displayReport.title ?? "Scouting Report"}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {formatDate(displayReport.created_at)}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ScoutingReportViewer report={displayReport} />
+            <div className="flex flex-wrap gap-2 no-print">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFullScreenReport(displayReport)}
+              >
+                <Maximize2 className="h-4 w-4 mr-1" />
+                Open Full Report
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleShare(displayReport)}
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEmailShare(displayReport)}
+              >
+                <Mail className="h-4 w-4 mr-1" />
+                Email
+              </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {reports.length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-4">Report History</h3>
+          <div className="space-y-2">
+            {reports.map((report) => {
+              const summary =
+                (report.report_json as ScoutingReportJson).executive_summary ??
+                (report.report_json as ScoutingReportJson).opponent_summary;
+              const isLatest = report.id === latestReportId;
+
+              return (
+                <Card
+                  key={report.id}
+                  className={`cursor-pointer transition-colors ${
+                    selectedReport?.id === report.id
+                      ? "border-primary"
+                      : "hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => setSelectedReport(report)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-medium truncate">
+                            {report.title ?? "Scouting Report"}
+                          </h4>
+                          {isLatest && <Badge variant="success">Latest</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {formatDate(report.created_at)}
+                        </p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {summary}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 shrink-0 no-print">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFullScreenReport(report);
+                          }}
+                          title="Open full report"
+                        >
+                          <Maximize2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(report);
+                          }}
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShare(report);
+                          }}
+                          title="Share link"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(report);
+                          }}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        </>
+        </div>
       )}
 
       <Dialog
@@ -413,14 +414,14 @@ export function ReportsTab({
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <ConfirmDialogContent>
-          <ConfirmDialogHeader>
-            <ConfirmDialogTitle>Delete this report?</ConfirmDialogTitle>
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this report?</DialogTitle>
             <DialogDescription>
               This action cannot be undone.
             </DialogDescription>
-          </ConfirmDialogHeader>
+          </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
               Cancel
@@ -433,8 +434,8 @@ export function ReportsTab({
               {deleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
-        </ConfirmDialogContent>
-      </ConfirmDialog>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

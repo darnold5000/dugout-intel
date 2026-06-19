@@ -4,268 +4,283 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
-import {
-  buildPlayerProfiles,
-  formatPlayerLabel,
-  battingSummary,
-  pitchingSummary,
-} from "@/lib/scouting/player-profiles";
+import { PlayerThreatCard } from "@/components/opponent/PlayerThreatCard";
+import { buildPlayerProfiles } from "@/lib/scouting/player-profiles";
 import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
-import { formatDate } from "@/lib/utils";
+import { evidenceSourceCount } from "@/lib/scouting/evidence-timeline";
 import type { OpponentDetail } from "@/types";
-import { ChevronDown, ChevronRight, Sparkles, Trophy } from "lucide-react";
+import { ChevronRight, Target, Users } from "lucide-react";
 
 interface OverviewTabProps {
   data: OpponentDetail;
-  onRefresh: () => Promise<void>;
   onSwitchTab: (tab: string) => void;
 }
 
-function LeaderCard({
+function SnapshotCard({ label, value }: { label: string; value: number }) {
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ThreatCard({
   title,
-  player,
+  jersey,
+  name,
   stat,
 }: {
   title: string;
-  player: string;
+  jersey: string | null;
+  name: string;
   stat: string;
 }) {
   return (
     <Card>
       <CardContent className="pt-4 pb-4">
         <p className="text-xs text-muted-foreground">{title}</p>
-        <p className="font-semibold text-sm mt-1 truncate">{player}</p>
+        <p className="font-semibold text-sm mt-1">
+          {jersey ? `${jersey} ` : ""}
+          {name}
+        </p>
         <p className="text-xs text-muted-foreground mt-0.5">{stat}</p>
       </CardContent>
     </Card>
   );
 }
 
-export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) {
-  const [showMergeDiagnostics, setShowMergeDiagnostics] = useState(false);
-  const [diagMessage, setDiagMessage] = useState("");
-  const [showRawData, setShowRawData] = useState(false);
+function playerTier(
+  profile: ReturnType<typeof buildPlayerProfiles>[number],
+  tier1: string[],
+  tier2: string[],
+  tier3: string[]
+): 1 | 2 | 3 | null {
+  const label = profile.jerseyNumber
+    ? `#${profile.jerseyNumber} ${profile.name ?? ""}`.trim()
+    : (profile.name ?? "");
+  if (tier1.some((t) => t.includes(profile.name ?? "") || t === label)) return 1;
+  if (tier2.some((t) => t.includes(profile.name ?? "") || t === label)) return 2;
+  if (tier3.some((t) => t.includes(profile.name ?? "") || t === label)) return 3;
+  return null;
+}
+
+const PREVIEW_COUNT = 8;
+
+export function OverviewTab({ data, onSwitchTab }: OverviewTabProps) {
+  const [showAllPlayers, setShowAllPlayers] = useState(false);
 
   const profiles = useMemo(() => buildPlayerProfiles(data), [data]);
   const intelligence = useMemo(() => buildTeamIntelligence(data), [data]);
 
-  const lastUpdated = useMemo(() => {
-    const dates = data.screenshot_uploads.map((u) => u.created_at);
-    if (!dates.length) return null;
-    return dates.sort().reverse()[0];
-  }, [data.screenshot_uploads]);
-
-  const battersWithStats = profiles.filter((p) => p.batting).length;
   const pitchersWithStats = profiles.filter(
     (p) => p.pitching?.innings_pitched != null
   ).length;
 
-  const hasData = profiles.length > 0 || data.screenshot_uploads.length > 0;
+  const evidenceCount = evidenceSourceCount(data);
+  const reportCount = data.scouting_reports?.length ?? 0;
 
-  const topHitter = intelligence.offensiveLeaders.highest_ops ?? intelligence.offensiveLeaders.highest_avg;
+  const hasData =
+    profiles.length > 0 ||
+    evidenceCount > 0 ||
+    data.screenshot_uploads.length > 0;
+
+  const topHitter =
+    intelligence.offensiveLeaders.highest_ops ??
+    intelligence.offensiveLeaders.highest_avg;
   const topPitcher = intelligence.pitchingLeaders.ace_pitcher;
   const topRunner = intelligence.offensiveLeaders.most_stolen_bases;
+  const patientHitter =
+    intelligence.offensiveLeaders.highest_obp ??
+    intelligence.offensiveLeaders.most_walks;
+
+  const sortedProfiles = useMemo(() => {
+    const { tier_1, tier_2, tier_3 } = intelligence.lineupThreatTiers;
+    return [...profiles].sort((a, b) => {
+      const tierA =
+        playerTier(a, tier_1, tier_2, tier_3) ?? 9;
+      const tierB =
+        playerTier(b, tier_1, tier_2, tier_3) ?? 9;
+      if (tierA !== tierB) return tierA - tierB;
+      return (b.batting?.ops ?? 0) - (a.batting?.ops ?? 0);
+    });
+  }, [profiles, intelligence.lineupThreatTiers]);
+
+  const visibleProfiles = showAllPlayers
+    ? sortedProfiles
+    : sortedProfiles.slice(0, PREVIEW_COUNT);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Players</p>
-            <p className="text-2xl font-semibold">{profiles.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Pitchers</p>
-            <p className="text-2xl font-semibold">{pitchersWithStats}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Screenshots</p>
-            <p className="text-2xl font-semibold">{data.screenshot_uploads.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Evidence Items</p>
-            <p className="text-2xl font-semibold">
-              {(data.screenshot_uploads?.length ?? 0) +
-                (data.opponent_notes?.length ?? 0) +
-                (data.opponent_voice_notes?.length ?? 0) +
-                (data.opponent_documents?.length ?? 0)}
-            </p>
-            {lastUpdated && (
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Updated {formatDate(lastUpdated)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {hasData && (topHitter || topPitcher || topRunner) && (
-        <div>
-          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <Trophy className="h-4 w-4" />
-            Team Leaders
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {topHitter && (
-              <LeaderCard
-                title="Top Hitter"
-                player={`${topHitter.jersey_number ? `#${topHitter.jersey_number} ` : ""}${topHitter.player_name}`}
-                stat={topHitter.stat_line}
-              />
-            )}
-            {topPitcher && (
-              <LeaderCard
-                title="Top Pitcher"
-                player={`${topPitcher.jersey_number ? `#${topPitcher.jersey_number} ` : ""}${topPitcher.player_name}`}
-                stat={topPitcher.stat_line}
-              />
-            )}
-            {topRunner && (intelligence.baseRunningThreats[0]?.stat_line.includes("SB") ?? false) && (
-              <LeaderCard
-                title="Top Runner"
-                player={`${topRunner.jersey_number ? `#${topRunner.jersey_number} ` : ""}${topRunner.player_name}`}
-                stat={topRunner.stat_line}
-              />
-            )}
-          </div>
+    <div className="space-y-8">
+      <section>
+        <h2 className="text-sm font-semibold mb-3">Team Snapshot</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <SnapshotCard label="Players" value={profiles.length} />
+          <SnapshotCard label="Pitchers" value={pitchersWithStats} />
+          <SnapshotCard label="Evidence Sources" value={evidenceCount} />
+          <SnapshotCard label="Reports" value={reportCount} />
         </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button onClick={() => onSwitchTab("report")} size="lg" className="sm:flex-1">
-          <Sparkles className="h-4 w-4 mr-2" />
-          Generate Scouting Report
-        </Button>
-        <RebuildStatsButton
-          opponentId={data.id}
-          onComplete={onRefresh}
-          showDiagnostics={showMergeDiagnostics}
-          onDiagnostics={setDiagMessage}
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showMergeDiagnostics}
-            onChange={(e) => setShowMergeDiagnostics(e.target.checked)}
-            className="rounded"
-          />
-          Show Merge Diagnostics (dev)
-        </label>
-      </div>
-      {showMergeDiagnostics && diagMessage && (
-        <p className="text-xs text-muted-foreground font-mono">{diagMessage}</p>
-      )}
+      </section>
 
       {!hasData ? (
         <Card>
           <CardContent className="py-12 text-center space-y-3">
             <p className="text-muted-foreground">
-              Add evidence in the Evidence tab — screenshots, notes, voice memos, or documents.
+              Upload screenshots, add notes, or record what you know about this team.
             </p>
             <Button variant="outline" onClick={() => onSwitchTab("evidence")}>
-              Go to Evidence
+              Add Evidence
             </Button>
           </CardContent>
         </Card>
       ) : (
         <>
-          {intelligence.teamIdentity && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Team Identity</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Badge variant="outline">{intelligence.teamIdentity.offensive_strength}</Badge>
-                <Badge variant="outline">Power: {intelligence.teamIdentity.power}</Badge>
-                <Badge variant="outline">Speed: {intelligence.teamIdentity.speed}</Badge>
-                <Badge variant="outline">Patience: {intelligence.teamIdentity.patience}</Badge>
-                <Badge variant="outline">{intelligence.teamIdentity.pitching_depth}</Badge>
-              </CardContent>
-            </Card>
+          {(topHitter || topPitcher || topRunner || patientHitter) && (
+            <section>
+              <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Top Threats
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {topHitter && (
+                  <ThreatCard
+                    title="Best Hitter"
+                    jersey={
+                      topHitter.jersey_number ? `#${topHitter.jersey_number}` : null
+                    }
+                    name={topHitter.player_name}
+                    stat={topHitter.stat_line}
+                  />
+                )}
+                {topPitcher && (
+                  <ThreatCard
+                    title="Best Pitcher"
+                    jersey={
+                      topPitcher.jersey_number ? `#${topPitcher.jersey_number}` : null
+                    }
+                    name={topPitcher.player_name}
+                    stat={topPitcher.stat_line}
+                  />
+                )}
+                {topRunner &&
+                  (intelligence.offensiveLeaders.most_stolen_bases?.stat_line.includes(
+                    "SB"
+                  ) ??
+                    false) && (
+                    <ThreatCard
+                      title="Best Runner"
+                      jersey={
+                        topRunner.jersey_number ? `#${topRunner.jersey_number}` : null
+                      }
+                      name={topRunner.player_name}
+                      stat={topRunner.stat_line}
+                    />
+                  )}
+                {patientHitter && (
+                  <ThreatCard
+                    title="Most Patient Hitter"
+                    jersey={
+                      patientHitter.jersey_number
+                        ? `#${patientHitter.jersey_number}`
+                        : null
+                    }
+                    name={patientHitter.player_name}
+                    stat={patientHitter.stat_line}
+                  />
+                )}
+              </div>
+            </section>
           )}
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">
-                Consolidated Players ({profiles.length})
-              </CardTitle>
-              <p className="text-xs text-muted-foreground font-normal">
-                One row per player — duplicates merged across screenshots.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {profiles.map((profile) => (
-                <div
-                  key={profile.key}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 py-2 border-b last:border-0 text-sm"
+          {intelligence.teamIdentity && (
+            <section>
+              <h2 className="text-sm font-semibold mb-3">Team Identity</h2>
+              <Card>
+                <CardContent className="pt-4 pb-4 flex flex-wrap gap-2">
+                  <Badge variant="outline">
+                    {intelligence.teamIdentity.offensive_strength}
+                  </Badge>
+                  <Badge variant="outline">
+                    Power: {intelligence.teamIdentity.power}
+                  </Badge>
+                  <Badge variant="outline">
+                    Speed: {intelligence.teamIdentity.speed}
+                  </Badge>
+                  <Badge variant="outline">
+                    Patience: {intelligence.teamIdentity.patience}
+                  </Badge>
+                  <Badge variant="outline">
+                    {intelligence.teamIdentity.pitching_depth}
+                  </Badge>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          {profiles.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Players Preview
+                </h2>
+                {sortedProfiles.length > PREVIEW_COUNT && !showAllPlayers && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setShowAllPlayers(true)}
+                  >
+                    View All Players
+                    <ChevronRight className="h-3 w-3 ml-1" />
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {visibleProfiles.map((profile) => (
+                  <PlayerThreatCard
+                    key={profile.key}
+                    profile={profile}
+                    tier={playerTier(
+                      profile,
+                      intelligence.lineupThreatTiers.tier_1,
+                      intelligence.lineupThreatTiers.tier_2,
+                      intelligence.lineupThreatTiers.tier_3
+                    )}
+                  />
+                ))}
+              </div>
+              {showAllPlayers && sortedProfiles.length > PREVIEW_COUNT && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 text-xs"
+                  onClick={() => setShowAllPlayers(false)}
                 >
-                  <span className="font-medium">{formatPlayerLabel(profile)}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {profile.batting ? battingSummary(profile) : ""}
-                    {profile.batting && profile.pitching ? " · " : ""}
-                    {profile.pitching ? pitchingSummary(profile) : ""}
-                    {!profile.batting && !profile.pitching ? "Roster only" : ""}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                  Show fewer players
+                </Button>
+              )}
+            </section>
+          )}
 
           {intelligence.dataGaps.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Data Gaps</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {intelligence.dataGaps.map((gap, i) => (
-                  <p key={i} className="text-sm text-muted-foreground">
-                    • {gap}
-                  </p>
-                ))}
-              </CardContent>
-            </Card>
+            <section>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">What We Still Need</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  {intelligence.dataGaps.map((gap, i) => (
+                    <p key={i} className="text-sm text-muted-foreground">
+                      • {gap}
+                    </p>
+                  ))}
+                </CardContent>
+              </Card>
+            </section>
           )}
-
-          <Card>
-            <CardHeader className="pb-3">
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 text-left"
-                onClick={() => setShowRawData((v) => !v)}
-              >
-                {showRawData ? (
-                  <ChevronDown className="h-4 w-4 shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0" />
-                )}
-                <CardTitle className="text-base">Raw Screenshot Data</CardTitle>
-                <span className="text-xs text-muted-foreground font-normal ml-auto">
-                  Collapsed by default
-                </span>
-              </button>
-            </CardHeader>
-            {showRawData && (
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  {battersWithStats} batters · {pitchersWithStats} pitchers ·{" "}
-                  {data.extracted_games.length} games in database.
-                </p>
-                <p>
-                  View individual screenshot tables on the Screenshots tab.
-                </p>
-              </CardContent>
-            )}
-          </Card>
         </>
       )}
     </div>
