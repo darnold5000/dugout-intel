@@ -133,7 +133,9 @@ export function buildPlayerProfiles(data: OpponentDetail): PlayerProfile[] {
   for (const stat of data.extracted_batting_stats) {
     const profile = ensureProfile(stat.player_name, stat.jersey_number);
     if (!profile) continue;
-    profile.batting = stat;
+    profile.batting = profile.batting
+      ? mergeBattingStat(profile.batting, stat)
+      : stat;
     profile.sourceUploadIds = uniqueUploadIds([
       ...profile.sourceUploadIds,
       ...(stat.source_upload_ids ?? []),
@@ -145,7 +147,9 @@ export function buildPlayerProfiles(data: OpponentDetail): PlayerProfile[] {
   for (const stat of data.extracted_pitching_stats) {
     const profile = ensureProfile(stat.player_name, stat.jersey_number);
     if (!profile) continue;
-    profile.pitching = stat;
+    profile.pitching = profile.pitching
+      ? mergePitchingStat(profile.pitching, stat)
+      : stat;
     profile.sourceUploadIds = uniqueUploadIds([
       ...profile.sourceUploadIds,
       ...(stat.source_upload_ids ?? []),
@@ -235,9 +239,77 @@ export function collectDataGaps(
   return gaps;
 }
 
+function statRichness(row: object): number {
+  return Object.values(row).filter((v) => v != null && v !== "").length;
+}
+
+function mergeBattingStat(
+  existing: ExtractedBattingStat,
+  incoming: ExtractedBattingStat
+): ExtractedBattingStat {
+  const pick = statRichness(incoming) >= statRichness(existing) ? incoming : existing;
+  const other = pick === incoming ? existing : incoming;
+  return {
+    ...other,
+    ...pick,
+    source_upload_ids: uniqueUploadIds([
+      ...(existing.source_upload_ids ?? []),
+      ...(incoming.source_upload_ids ?? []),
+      existing.source_upload_id ?? "",
+      incoming.source_upload_id ?? "",
+    ]),
+    confidence: maxConfidence(existing.confidence, incoming.confidence),
+    player_name: pick.player_name ?? other.player_name,
+    jersey_number: pick.jersey_number ?? other.jersey_number,
+  };
+}
+
+function mergePitchingStat(
+  existing: ExtractedPitchingStat,
+  incoming: ExtractedPitchingStat
+): ExtractedPitchingStat {
+  const pick = statRichness(incoming) >= statRichness(existing) ? incoming : existing;
+  const other = pick === incoming ? existing : incoming;
+  return {
+    ...other,
+    ...pick,
+    source_upload_ids: uniqueUploadIds([
+      ...(existing.source_upload_ids ?? []),
+      ...(incoming.source_upload_ids ?? []),
+      existing.source_upload_id ?? "",
+      incoming.source_upload_id ?? "",
+    ]),
+    confidence: maxConfidence(existing.confidence, incoming.confidence),
+    player_name: pick.player_name ?? other.player_name,
+    jersey_number: pick.jersey_number ?? other.jersey_number,
+  };
+}
+
+export function formatPlayerDisplayLabel(profile: {
+  name: string | null;
+  jerseyNumber: string | null;
+}): string {
+  if (profile.jerseyNumber && profile.name) {
+    return `#${profile.jerseyNumber} ${profile.name}`;
+  }
+  if (profile.jerseyNumber) return `#${profile.jerseyNumber}`;
+  return profile.name ?? "Unknown";
+}
+
 export function formatPlayerLabel(profile: PlayerProfile): string {
-  const jersey = profile.jerseyNumber ? ` #${profile.jerseyNumber}` : "";
-  return `${profile.name ?? "Unknown"}${jersey}`;
+  return formatPlayerDisplayLabel(profile);
+}
+
+export function getConsolidatedPitchingStats(
+  data: OpponentDetail
+): ExtractedPitchingStat[] {
+  return buildPlayerProfiles(data)
+    .filter((p) => p.pitching)
+    .map((p) => ({
+      ...p.pitching!,
+      player_name: p.name,
+      jersey_number: p.jerseyNumber,
+    }));
 }
 
 export function battingSummary(profile: PlayerProfile): string {

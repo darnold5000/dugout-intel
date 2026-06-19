@@ -1,10 +1,14 @@
-import { parsePlayerIdentity } from "@/lib/extraction/player-identity";
+import { parsePlayerIdentity, resolveConsolidationKey, buildCanonicalKeyMap } from "@/lib/extraction/player-identity";
 import {
   buildPlayerProfiles,
   collectDataGaps,
   formatPlayerLabel,
   type PlayerProfile,
 } from "@/lib/scouting/player-profiles";
+import {
+  pitchingRoleWithSampleSize,
+  pitchingSampleConfidence,
+} from "@/lib/scouting/sample-size";
 import type {
   ConfidenceByCategory,
   ExtractedPitchingStat,
@@ -79,9 +83,15 @@ function leader(
 }
 
 function parseAdvancedPitchingFromUploads(
-  uploads: ScreenshotUpload[]
+  uploads: ScreenshotUpload[],
+  profiles: PlayerProfile[]
 ): Map<string, AdvancedPitchingStats> {
   const result = new Map<string, AdvancedPitchingStats>();
+  const identityEntries = profiles.map((p) => ({
+    name: p.name,
+    jersey: p.jerseyNumber,
+  }));
+  const canonicalMap = buildCanonicalKeyMap(identityEntries);
 
   for (const upload of uploads) {
     const table = upload.raw_extracted_table;
@@ -104,7 +114,11 @@ function parseAdvancedPitchingFromUploads(
       const rawName = row[nameIdx]?.trim();
       if (!rawName) continue;
       const parsed = parsePlayerIdentity(rawName, null);
-      const key = parsed.player_name?.toLowerCase();
+      const key = resolveConsolidationKey(
+        parsed.player_name,
+        parsed.jersey_number,
+        canonicalMap
+      );
       if (!key) continue;
 
       const existing = result.get(key) ?? {
@@ -136,9 +150,8 @@ function getAdvancedPitching(
   profile: PlayerProfile,
   advancedMap: Map<string, AdvancedPitchingStats>
 ): AdvancedPitchingStats {
-  const key = profile.name?.toLowerCase() ?? "";
   return (
-    advancedMap.get(key) ?? {
+    advancedMap.get(profile.key) ?? {
       first_pitch_strike_pct: null,
       batters_faced: null,
     }
@@ -243,13 +256,27 @@ function buildPitchingLeaders(profiles: PlayerProfile[]): PitchingLeaders {
     return parts.join(", ");
   };
 
+  const aceRoleLabel = (p: PlayerProfile) => {
+    const confidence = pitchingSampleConfidence(
+      p.pitching?.innings_pitched ?? null,
+      p.pitching?.batters_faced ?? null
+    );
+    const base =
+      confidence === "low" ? "Likely Primary Pitcher" : "Primary Pitcher";
+    return pitchingRoleWithSampleSize(
+      base,
+      confidence,
+      p.pitching?.innings_pitched ?? null
+    );
+  };
+
   return {
     ace_pitcher: ace
       ? leader(
-          "Ace Pitcher",
+          aceRoleLabel(ace).split("(")[0].trim(),
           ace,
           aceLabel(ace),
-          `${formatPlayerLabel(ace)} appears to be the primary pitcher with ${aceLabel(ace)}.`
+          aceRoleLabel(ace)
         )
       : null,
     strike_thrower: strikeThrower
@@ -530,29 +557,34 @@ function buildPlayerScoutingCard(
   }
 
   let assessment = "Limited data available.";
-  let gamePlan = "Scout in-game and adjust.";
+  let howToAttack = "Scout in-game and adjust our approach.";
 
-  if (b) {
+  if (b && role !== "pitcher") {
     const ops = b.ops ?? b.obp ?? b.avg ?? 0;
     if (ops >= 1.0) {
-      assessment = "Most dangerous offensive player on roster.";
-      gamePlan = "Avoid free passes. Keep off the bases. Control running game.";
+      assessment = "Most dangerous offensive player on their roster.";
+      howToAttack =
+        "Our pitching: avoid free passes; pitch around in leverage spots; hold runners.";
     } else if (ops >= 0.8) {
-      assessment = "Solid contributor — can hurt you in key spots.";
-      gamePlan = "Pitch carefully. Don't give free bases.";
+      assessment = "Solid contributor — can hurt us in key spots.";
+      howToAttack =
+        "Our pitching: limit mistakes; don't groove pitches in RBI situations.";
     } else if ((b.strikeouts ?? 0) >= 8 && (b.avg ?? 1) < 0.25) {
-      assessment = "Strikeout-prone — attack the zone.";
-      gamePlan = "Expand the zone. Get ahead early.";
+      assessment = "Strikeout-prone — chases and misses.";
+      howToAttack =
+        "Our pitching: attack the zone early; expand the strike zone with two strikes.";
     } else if ((b.walks ?? 0) >= 5) {
-      assessment = "Patient hitter — works counts.";
-      gamePlan = "Throw strikes early. Don't nibble.";
+      assessment = "Patient hitter — works counts and takes walks.";
+      howToAttack =
+        "Our pitching: throw strikes on the first pitch; don't nibble or fall behind.";
     } else {
-      assessment = "Capable hitter — respect but can be pitched to.";
-      gamePlan = "Standard approach — execute your game plan.";
+      assessment = "Capable contact hitter — respect but can be pitched to.";
+      howToAttack =
+        "Our pitching: standard approach — execute locations and trust your defense.";
     }
 
     if ((b.stolen_bases ?? 0) >= 8) {
-      gamePlan += " Hold runners and quick catcher release.";
+      howToAttack += " Our defense: hold runners and quick catcher release.";
     }
   }
 
@@ -564,25 +596,33 @@ function buildPlayerScoutingCard(
     const pitches = pitchCount(p);
 
     if (fps != null && (fps <= 1 ? fps * 100 : fps) >= 60) {
-      assessment = `${label} works ahead well with a ${formatPct(fps)} first-pitch strike rate.`;
-      gamePlan = "Expect strikes early — be ready to swing on the first pitch.";
+      assessment = `${label} works ahead in counts (${formatPct(fps)} first-pitch strikes).`;
+      howToAttack =
+        "Our hitters: be ready on the first pitch; attack hittable strikes early.";
     } else if (
       fps != null &&
       (fps <= 1 ? fps * 100 : fps) < 50 &&
       wRate >= 0.8
     ) {
-      assessment = `${label} has command concerns. FPS% is below 50% and BB/INN is high.`;
-      gamePlan =
-        "Take until strike one and force him into hitter counts.";
+      assessment = `${label} has command concerns — falls behind in counts.`;
+      howToAttack =
+        "Our hitters: take pitches; work counts; don't chase until they prove the zone.";
     } else if (kRate >= 1.5 || (p.swing_miss_pct ?? 0) > 30) {
-      assessment = `${label} is a swing-and-miss arm — expect strikeouts.`;
-      gamePlan = "Shorten swing. Put ball in play.";
+      assessment = `${label} is a swing-and-miss arm — generates strikeouts.`;
+      howToAttack =
+        "Our hitters: shorten the swing; battle; put the ball in play.";
     } else if (wRate >= 1.0) {
-      assessment = `${label} has control issues — can fall behind in counts.`;
-      gamePlan = "Be patient. Make them throw strikes.";
+      assessment = `${label} struggles with command — walks batters.`;
+      howToAttack =
+        "Our hitters: be patient; make them throw strikes; take walks when offered.";
     } else if ((p.innings_pitched ?? 0) >= 8 || (pitches ?? 0) >= 150) {
-      assessment = `${label} appears to be the primary pitcher with ${p.innings_pitched!.toFixed(1)} IP${pitches != null ? ` and ${pitches} total pitches` : ""}.`;
-      gamePlan = "Be aggressive early. Don't let them settle in.";
+      assessment = `${label} appears to be their primary pitcher (${p.innings_pitched!.toFixed(1)} IP${pitches != null ? `, ${pitches} pitches` : ""}).`;
+      howToAttack =
+        "Our hitters: pressure them early in the count before they settle in.";
+    } else {
+      assessment = `${label} — limited pitching sample observed.`;
+      howToAttack =
+        "Our hitters: scout their tendencies in-game and adjust approach.";
     }
   }
 
@@ -591,14 +631,17 @@ function buildPlayerScoutingCard(
     player_name: profile.name ?? "Unknown",
     key_stats: parts.join("\n"),
     assessment,
-    game_plan: gamePlan,
+    how_to_attack: howToAttack,
     role,
   };
 }
 
 export function buildTeamIntelligence(data: OpponentDetail): TeamIntelligence {
   const profiles = buildPlayerProfiles(data);
-  const advancedMap = parseAdvancedPitchingFromUploads(data.screenshot_uploads);
+  const advancedMap = parseAdvancedPitchingFromUploads(
+    data.screenshot_uploads,
+    profiles
+  );
   const offensiveLeaders = buildOffensiveLeaders(profiles);
   const pitchingLeaders = buildPitchingLeaders(profiles);
   const baseRunningThreats = buildBaseRunningThreats(profiles);
@@ -629,20 +672,24 @@ export function buildTeamIntelligence(data: OpponentDetail): TeamIntelligence {
     })
     .slice(0, 5);
 
-  const playerScoutingCards: PlayerScoutingCard[] = topHitters.map((p) =>
-    buildPlayerScoutingCard(
-      p,
-      p.pitching?.innings_pitched ? "two-way" : "hitter"
-    )
-  );
+  const playerScoutingCards: PlayerScoutingCard[] = [];
+  const cardKeys = new Set<string>();
+
+  const addCard = (profile: PlayerProfile, role: PlayerScoutingCard["role"]) => {
+    if (cardKeys.has(profile.key)) return;
+    cardKeys.add(profile.key);
+    playerScoutingCards.push(buildPlayerScoutingCard(profile, role));
+  };
+
+  for (const p of topHitters) {
+    addCard(p, p.pitching?.innings_pitched ? "two-way" : "hitter");
+  }
 
   for (const p of sortByDesc(
     profiles.filter((p) => p.pitching?.innings_pitched),
     (p) => p.pitching?.innings_pitched ?? null
   ).slice(0, 3)) {
-    if (!playerScoutingCards.some((c) => c.player_name === p.name)) {
-      playerScoutingCards.push(buildPlayerScoutingCard(p, "pitcher"));
-    }
+    addCard(p, "pitcher");
   }
 
   const playersToAttack = weakHitters.map((p) =>
@@ -685,7 +732,10 @@ export function intelligenceToReportJson(
     offensive_tendencies: string;
     pitching_notes: string;
     suggested_game_plan: string;
-  }>
+  }>,
+  extras?: {
+    pitchingStaffBreakdown?: string;
+  }
 ): import("@/types").ScoutingReportJson {
   const { teamIdentity, confidenceByCategory } = intelligence;
 
@@ -697,7 +747,8 @@ export function intelligenceToReportJson(
     .slice(0, 5)
     .map((c) => {
       const jersey = c.jersey_number ? `#${c.jersey_number} ` : "";
-      return `${jersey}${c.player_name}\n${c.key_stats}\nAssessment: ${c.assessment}\nGame Plan: ${c.game_plan}`;
+      const approach = c.how_to_attack ?? c.game_plan ?? "";
+      return `${jersey}${c.player_name}\n${c.key_stats}\nAssessment: ${c.assessment}\nHow To Attack: ${approach}`;
     });
 
   const offensiveTendencies =
@@ -737,15 +788,38 @@ export function intelligenceToReportJson(
       .join(" ");
 
   return {
+    executive_summary:
+      aiNarrative?.opponent_summary ??
+      `Scouting report based on ${intelligence.profiles.length} consolidated players. ${teamIdentity.offensive_strength} with ${teamIdentity.speed} speed and ${teamIdentity.pitching_depth.toLowerCase()}.`,
     opponent_summary:
       aiNarrative?.opponent_summary ??
       `Scouting report based on ${intelligence.profiles.length} consolidated players. ${teamIdentity.offensive_strength} with ${teamIdentity.speed} speed and ${teamIdentity.pitching_depth.toLowerCase()}.`,
     offensive_tendencies: offensiveTendencies,
+    offensive_threats: offensiveTendencies,
     pitching_notes: pitchingNotes,
+    pitching_staff_breakdown: extras?.pitchingStaffBreakdown ?? pitchingNotes,
+    recommended_game_plan:
+      aiNarrative?.suggested_game_plan ??
+      [
+        intelligence.baseRunningThreats.length > 0
+          ? "Hold runners, slide step, quick catcher release."
+          : "",
+        intelligence.playersToAvoid.length > 0
+          ? intelligence.playersToAvoid
+              .map(
+                (p) =>
+                  `${p.jersey_number ? `#${p.jersey_number} ` : ""}${p.player_name}: ${p.how_to_attack ?? p.game_plan ?? ""}`
+              )
+              .join(" ")
+          : "",
+        "Execute your team's strengths against their weak spots.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     players_to_watch: playersToWatch,
     weaknesses_opportunities:
       intelligence.playersToAttack.length > 0
-        ? `Attack: ${intelligence.playersToAttack.map((p) => p.player_name).join(", ")}. ${intelligence.playersToAttack[0]?.game_plan ?? ""}`
+        ? `Attack: ${intelligence.playersToAttack.map((p) => p.player_name).join(", ")}. ${intelligence.playersToAttack[0]?.how_to_attack ?? intelligence.playersToAttack[0]?.game_plan ?? ""}`
         : "Look for strikeout-prone hitters and pitchers with control issues.",
     suggested_game_plan:
       aiNarrative?.suggested_game_plan ??
@@ -754,12 +828,13 @@ export function intelligenceToReportJson(
           ? "Hold runners, slide step, quick catcher release."
           : "",
         intelligence.playersToAvoid.length > 0
-          ? `Avoid pitching to: ${intelligence.playersToAvoid.map((p) => p.player_name).join(", ")}.`
+          ? `Avoid pitching to: ${intelligence.playersToAvoid.map((p) => `${p.jersey_number ? `#${p.jersey_number} ` : ""}${p.player_name}`).join(", ")}.`
           : "",
         "Execute your team's strengths against their weak spots.",
       ]
         .filter(Boolean)
         .join(" "),
+    evidence_and_confidence: `Offense: ${confidenceByCategory.offense} | Pitching: ${confidenceByCategory.pitching} | Baserunning: ${confidenceByCategory.baserunning} | Defense: ${confidenceByCategory.defense}`,
     confidence_level: `Offense: ${confidenceByCategory.offense} | Pitching: ${confidenceByCategory.pitching} | Baserunning: ${confidenceByCategory.baserunning} | Defense: ${confidenceByCategory.defense}`,
     unknowns_data_gaps: intelligence.dataGaps,
     team_identity: teamIdentity,
@@ -837,7 +912,7 @@ export function formatIntelligenceReportText(
         `### ${jersey}${card.player_name}`,
         card.key_stats,
         `Assessment: ${card.assessment}`,
-        `Game Plan: ${card.game_plan}`,
+        `How To Attack: ${card.how_to_attack ?? card.game_plan ?? ""}`,
         ""
       );
     }
@@ -857,7 +932,7 @@ export function formatIntelligenceReportText(
     for (const t of report.base_running_threats) {
       lines.push(`- #${t.jersey_number ?? "?"} ${t.player_name}: ${t.stat_line}`);
     }
-    lines.push("Game Plan: Hold runners, slide step, quick catcher release.", "");
+    lines.push("Our defense: hold runners, slide step, quick catcher release.", "");
   }
 
   if (report.pitching_hierarchy) {

@@ -1,6 +1,17 @@
 import { parseBaseballInnings, formatBaseballInnings } from "@/lib/scouting/innings";
+import {
+  buildPlayerProfiles,
+  formatPlayerDisplayLabel,
+  getConsolidatedPitchingStats,
+} from "@/lib/scouting/player-profiles";
+import {
+  formatConfidenceLabel,
+  pitchingRoleWithSampleSize,
+  pitchingSampleConfidence,
+} from "@/lib/scouting/sample-size";
 import type {
   ExtractedPitchingStat,
+  OpponentDetail,
   OpponentGameContext,
   OpponentNote,
   OpponentVoiceNote,
@@ -82,6 +93,17 @@ function noteMentionsPitcher(
     return parts.some((p) => p.length > 2 && lower.includes(p));
   }
   return false;
+}
+
+export function analyzePitchingStaffFromDetail(
+  data: OpponentDetail
+): PitcherAnalysis[] {
+  return analyzePitchingStaff(
+    getConsolidatedPitchingStats(data),
+    data.opponent_notes ?? [],
+    data.opponent_voice_notes ?? [],
+    data.opponent_game_context ?? []
+  );
 }
 
 export function analyzePitchingStaff(
@@ -210,27 +232,36 @@ export function analyzePitchingStaff(
         roleLabels.push("Contact Pitcher");
       }
 
+      const bf = stat.batters_faced;
+      const sampleConfidence = pitchingSampleConfidence(ip, bf);
       const uniqueRoles = Array.from(new Set(roleLabels));
       const roleConfidence: "low" | "medium" | "high" =
-        score >= 6 ? "high" : score >= 3 ? "medium" : "low";
+        sampleConfidence === "low"
+          ? "low"
+          : score >= 6
+            ? "high"
+            : score >= 3
+              ? "medium"
+              : "low";
 
-      const label = [
-        stat.jersey_number ? `#${stat.jersey_number}` : null,
-        stat.player_name,
-      ]
-        .filter(Boolean)
-        .join(" ");
+      const label = formatPlayerDisplayLabel({
+        name: stat.player_name,
+        jerseyNumber: stat.jersey_number,
+      });
 
       let coachTakeaway = "";
       if (uniqueRoles.includes("Likely Main Pitcher")) {
         coachTakeaway =
-          "Expect in important innings. Be ready early in counts if strike % is strong.";
+          "Our hitters: expect them in important innings; be ready early in counts if strike % is strong.";
       } else if (uniqueRoles.includes("Strike Thrower")) {
-        coachTakeaway = "Attacks the zone. Be ready to swing on first-pitch strikes.";
+        coachTakeaway =
+          "Our hitters: they attack the zone — be ready to swing on hittable first-pitch strikes.";
       } else if (uniqueRoles.includes("Wild But Effective")) {
-        coachTakeaway = "Falls behind hitters. Patient approach may force mistakes.";
+        coachTakeaway =
+          "Our hitters: patient approach may force mistakes when they fall behind.";
       } else {
-        coachTakeaway = "Limited usage data — treat as depth unless bracket notes say otherwise.";
+        coachTakeaway =
+          "Our approach: treat as depth unless bracket notes indicate higher leverage usage.";
       }
 
       const strikeThrower =
@@ -251,8 +282,12 @@ export function analyzePitchingStaff(
       }
 
       let role = "Depth";
-      if (uniqueRoles.includes("Likely Main Pitcher")) role = "Ace";
-      else if (uniqueRoles.includes("High-Leverage Arm")) role = "High-Leverage";
+      if (uniqueRoles.includes("Likely Main Pitcher")) {
+        role =
+          sampleConfidence === "low"
+            ? pitchingRoleWithSampleSize("Likely Primary Pitcher", sampleConfidence, ip)
+            : "Primary Pitcher";
+      } else if (uniqueRoles.includes("High-Leverage Arm")) role = "High-Leverage";
       else if (uniqueRoles.includes("Strike Thrower")) role = "Strike Thrower";
 
       let likelyUsage = "Unknown usage";
@@ -266,6 +301,19 @@ export function analyzePitchingStaff(
         likelyUsage = "Primary workload arm";
       } else if (workload === "Light") {
         likelyUsage = "Spot / depth usage";
+      }
+
+      if (stat.pitches != null && ip != null && ip > 0) {
+        const ppi = stat.pitches / ip;
+        if (ppi >= 20) {
+          evidence.push(`High workload: ${ppi.toFixed(0)} pitches per inning`);
+        } else if (ppi <= 12) {
+          evidence.push(`Efficient: ${ppi.toFixed(0)} pitches per inning`);
+        }
+      }
+
+      if (stat.strike_percentage != null && stat.strike_percentage < 0.5) {
+        evidence.push("Wild pitcher — sub-50% strike rate");
       }
 
       return {
@@ -298,7 +346,10 @@ export function analyzePitchingStaff(
           ip != null && ip > 0 && stat.strikeouts != null
             ? stat.strikeouts / ip
             : null,
-        evidence,
+        evidence: [
+          ...evidence,
+          `Confidence: ${formatConfidenceLabel(sampleConfidence)}`,
+        ],
         coachTakeaway,
         bracketAppearances,
         highLeverageSignals,

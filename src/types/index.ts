@@ -15,7 +15,8 @@ export type NoteType =
   | "hitting"
   | "baserunning"
   | "defense"
-  | "tournament_context";
+  | "tournament_context"
+  | "gamechanger_recap";
 
 export type Importance = "low" | "medium" | "high";
 
@@ -319,7 +320,10 @@ export interface PlayerScoutingCard {
   player_name: string;
   key_stats: string;
   assessment: string;
-  game_plan: string;
+  /** Advice for our team on how to approach this opponent player. */
+  how_to_attack: string;
+  /** @deprecated Use how_to_attack — kept for older saved reports */
+  game_plan?: string;
   role: "hitter" | "pitcher" | "two-way";
 }
 

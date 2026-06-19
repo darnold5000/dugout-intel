@@ -34,6 +34,7 @@ import {
   resolveGameScore,
 } from "@/lib/scouting/game-results";
 import { RecentGamesSection } from "@/components/opponent/RecentGamesSection";
+import { inferNoteTypeFromText } from "@/lib/scouting/recap-extraction";
 import { formatDate } from "@/lib/utils";
 import type {
   ExtractionResult,
@@ -207,13 +208,41 @@ export function ScoutNotesTab({
         headers: { ...authHeaders, "Content-Type": "application/json" },
         body: JSON.stringify(uploadIds ? { upload_ids: uploadIds } : {}),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || "Extraction failed");
+      const data = await res.json();
+
+      if (data.totals) {
+        setExtractionSummary(data.totals);
       }
-      const results = (await res.json()) as ExtractionResult[];
-      const last = results[results.length - 1];
-      if (last?.counts) setExtractionSummary(last.counts);
+
+      if (!res.ok) {
+        const failed = data.results?.find(
+          (r: ExtractionResult) => r.status === "failed"
+        );
+        throw new Error(failed?.error || data.error || "Extraction failed");
+      }
+
+      const last = data.results?.[data.results.length - 1] as
+        | ExtractionResult
+        | undefined;
+      if (last?.counts) {
+        setExtractionSummary(last.counts);
+      }
+
+      const extractedCount =
+        (last?.counts?.players ?? 0) +
+        (last?.counts?.batting_stats ?? 0) +
+        (last?.counts?.pitching_stats ?? 0) +
+        (last?.counts?.games ?? 0);
+
+      if (last?.status === "complete" && extractedCount === 0) {
+        const hint =
+          last.warnings?.[0] ??
+          "Could not read stats or game results from this screenshot.";
+        setError(
+          `${hint} Try a closer crop of the stat table, or set the screenshot type to Schedule / Results and re-run extraction.`
+        );
+      }
+
       await onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed");
@@ -262,7 +291,7 @@ export function ScoutNotesTab({
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({
         note_text: text,
-        note_type: "general",
+        note_type: inferNoteTypeFromText(text),
         game_type: context.game_type,
         game_date: context.game_date || null,
         opponent_played: context.opponent_played || null,

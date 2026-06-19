@@ -36,13 +36,35 @@ export function normalizePlayerName(name: string): string {
   return normalizeSpaces(name.replace(/\./g, "")).toLowerCase();
 }
 
+function stripPositionAnnotations(name: string): string {
+  return normalizeSpaces(
+    name.replace(
+      /\s*\(\s*(?:3B|1B|2B|SS|OF|IF|P|C|LHP|RHP|DH|CF|RF|LF|UTIL)(?:\s*[/,]\s*(?:3B|1B|2B|SS|OF|IF|P|C|LHP|RHP|DH|CF|RF|LF|UTIL))*\s*\)\s*/gi,
+      " "
+    )
+  );
+}
+
 /** Extract jersey number embedded in a player name string. */
 function extractJerseyFromName(name: string): {
   cleanName: string;
   jersey: string | null;
   unparsed: boolean;
 } {
-  const working = normalizeSpaces(name.replace(/,/g, " ").trim());
+  let working = stripPositionAnnotations(
+    normalizeSpaces(name.replace(/,/g, " ").trim())
+  );
+
+  const inlineJersey = working.match(/#\s*(\d{1,3})/);
+  if (inlineJersey) {
+    const jersey = stripHash(inlineJersey[1]);
+    working = normalizeSpaces(
+      working.replace(/#\s*\d{1,3}/, "").replace(/\s+/g, " ").trim()
+    );
+    if (working) {
+      return { cleanName: working, jersey, unparsed: false };
+    }
+  }
 
   const patterns: RegExp[] = [
     /^#\s*(\d{1,3})\s+(.+)$/i,
@@ -218,6 +240,28 @@ export function buildCanonicalKeyMap(
     canonical.set(`${nameKey}|${jersey}`, nameKey);
   }
 
+  // Tier 1: jersey number wins — merge name variants sharing the same number
+  const namesByJersey = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    const parsed = parsePlayerIdentity(entry.name, entry.jersey);
+    if (!parsed.jersey_number || !parsed.player_name) continue;
+    const nameKey = normalizePlayerName(parsed.player_name);
+    const group = namesByJersey.get(parsed.jersey_number) ?? new Set();
+    group.add(nameKey);
+    namesByJersey.set(parsed.jersey_number, group);
+  }
+
+  for (const [jersey, nameKeys] of namesByJersey) {
+    const sorted = [...nameKeys].sort((a, b) => b.length - a.length);
+    const winner = sorted[0];
+    if (!winner) continue;
+    canonical.set(`jersey:${jersey}`, winner);
+    for (const nameKey of nameKeys) {
+      canonical.set(nameKey, winner);
+      canonical.set(`${nameKey}|${jersey}`, winner);
+    }
+  }
+
   return canonical;
 }
 
@@ -226,10 +270,26 @@ export function resolveConsolidationKey(
   jerseyNumber: string | null | undefined,
   canonicalMap?: Map<string, string>
 ): string | null {
-  const rawKey = getConsolidationKey(playerName, jerseyNumber);
-  if (!rawKey) return null;
-  if (!canonicalMap) return rawKey;
-  return canonicalMap.get(rawKey) ?? rawKey;
+  const parsed = parsePlayerIdentity(playerName, jerseyNumber);
+
+  if (!parsed.player_name && parsed.jersey_number) {
+    const rawKey = `jersey:${parsed.jersey_number}`;
+    return canonicalMap?.get(rawKey) ?? rawKey;
+  }
+
+  if (!parsed.player_name) return null;
+
+  const nameKey = normalizePlayerName(parsed.player_name);
+  if (!canonicalMap) return nameKey;
+
+  if (parsed.jersey_number) {
+    const byJersey = canonicalMap.get(`jersey:${parsed.jersey_number}`);
+    if (byJersey) return byJersey;
+    const byMerge = canonicalMap.get(`${nameKey}|${parsed.jersey_number}`);
+    if (byMerge) return byMerge;
+  }
+
+  return canonicalMap.get(nameKey) ?? nameKey;
 }
 
 export function isExcludedPlayerRow(

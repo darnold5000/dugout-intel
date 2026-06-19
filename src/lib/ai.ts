@@ -94,6 +94,14 @@ Always populate raw_extracted_table when any tabular data is visible:
   "rows": [["row1col1", "row1col2"], ["row2col1", "row2col2"]]
 }
 
+SCHEDULE / RESULTS SCREENS (CRITICAL):
+GameChanger schedule and results views are often vertical LISTS, not stat tables.
+- Set screenshot_type to schedule_results when you see past/upcoming games with opponents, dates, and scores.
+- Populate games with one object per visible game row (opponent_name, game_date as YYYY-MM-DD when possible, result W/L/T, runs_for, runs_against).
+- For schedule_results or box_score screenshots, an empty raw_extracted_table is OK when games are populated.
+- Do NOT return screenshot_type unknown for a readable schedule/results list.
+- Do NOT warn "screenshot does not contain tabular data" when games were extracted from a schedule view.
+
 Return ONLY valid JSON matching this schema:
 {
   "screenshot_type": "roster | batting_stats | pitching_stats | schedule_results | box_score | unknown",
@@ -109,6 +117,15 @@ Return ONLY valid JSON matching this schema:
 
 const REPORT_NARRATIVE_PROMPT = `You are a youth baseball scouting assistant writing reports for coaches of 9U-12U travel ball teams.
 
+SCOUTING REPORT PERSPECTIVE RULE (CRITICAL):
+- All reports are written for the SCOUTING TEAM (our team).
+- The opponent is the team being analyzed (them).
+- Every recommendation must answer: "What should OUR team do against THEM?"
+- Write assessments about the opponent; write game plans for our coaches and players.
+- Never generate recommendations from the opponent's perspective.
+- BAD: "Pitch Carson in the 5th inning" or "Have Maverick bunt more often."
+- GOOD: "Attack their secondary pitchers after the 4th" or "Pitch around #44 Maverick W."
+
 You will receive PRE-COMPUTED scouting intelligence with verified stats and player rankings, plus a full evidence packet (screenshots, coach notes, voice transcripts, documents, game context). Your job is to write compelling narrative prose that references specific players and stats from the data.
 
 Write in plain English, coach-friendly tone. Be practical and actionable.
@@ -117,19 +134,23 @@ CRITICAL RULES:
 - Use ALL evidence provided: structured intelligence, screenshots/raw tables, coach notes, voice transcripts, documents, and game context.
 - Clearly distinguish CONFIRMED DATA (from stats/screenshots) from NOTE-BASED INFERENCE (from coach notes/voice).
 - Label inferences explicitly: "Note-based inference: ..."
-- Reference players by name AND jersey number when available.
+- Reference opponent players by name AND jersey number when available.
 - For pitching: analyze pitch counts, strikes, balls, strike %, innings pitched, and pitcher roles.
 - Use the pre-computed pitching staff analysis when provided.
 - Weight scout notes by the \`weight\` field (1-5). Championship/bracket and pitching box scores are highest weight; pool play is lower.
 - Baseball innings: 2.1 IP = 2 and 1/3 innings, NOT 2.1 decimal innings.
 - Do NOT invent stats. Do NOT contradict the structured intelligence.
+- suggested_game_plan must be advice TO our coaching staff about how to beat the opponent.
+- offensive_tendencies and pitching_notes describe what OUR team will face — not advice to the opponent.
+- Use "our hitters", "our pitching", "our defense" when giving approach advice.
+- Player cards in the intelligence data use "How To Attack" — follow that framing for per-player advice.
 
 Return ONLY valid JSON:
 {
-  "opponent_summary": string (2-3 sentences, coach-friendly),
-  "offensive_tendencies": string (specific players and stats),
-  "pitching_notes": string (specific pitchers, IP, FPS% if available),
-  "suggested_game_plan": string (actionable pre-game plan in 3-5 bullet points as prose)
+  "opponent_summary": string (2-3 sentences describing the opponent — not advice to them),
+  "offensive_tendencies": string (what our team should expect from their offense),
+  "pitching_notes": string (what our team should expect from their pitching staff),
+  "suggested_game_plan": string (what OUR team should do — actionable pre-game plan in 3-5 bullet points as prose)
 }`;
 
 export async function extractFromScreenshot(
@@ -146,7 +167,7 @@ export async function extractFromScreenshot(
           content: [
             {
               type: "text",
-              text: "Extract all baseball data from this GameChanger screenshot. Read the screenshot as a table. Capture exact column headers in raw_extracted_table, then map visible stat columns into batting_stats or pitching_stats. Return structured JSON only.",
+              text: "Extract all baseball data from this GameChanger screenshot. If this is a stat table, capture exact column headers in raw_extracted_table and map rows into batting_stats or pitching_stats. If this is a schedule/results list, set screenshot_type to schedule_results and populate the games array (opponent, date, W/L, score). Return structured JSON only.",
             },
             {
               type: "image_url",
@@ -180,6 +201,126 @@ export async function extractFromScreenshot(
     headers: [],
     rows: [],
   };
+
+  const enriched = enrichExtractionResult(parsed);
+  if (!isEmptyExtraction(enriched)) {
+    return enriched;
+  }
+
+  return extractScheduleFromScreenshot(imageDataUrl, enriched.warnings);
+}
+
+const SCHEDULE_EXTRACTION_PROMPT = `You extract game results from GameChanger schedule or results screenshots.
+
+These screens show a vertical list of games — NOT a batting/pitching stat table.
+Each row typically has: date, opponent team name, W/L result, and score (runs for / runs against).
+
+Return ONLY valid JSON:
+{
+  "screenshot_type": "schedule_results",
+  "team_name": string | null,
+  "raw_extracted_table": { "headers": [], "rows": [] },
+  "players": [],
+  "batting_stats": [],
+  "pitching_stats": [],
+  "games": [{ "opponent_name": string | null, "game_date": string | null, "result": string | null, "runs_for": number | null, "runs_against": number | null, "notes": string | null, "confidence": number }],
+  "warnings": string[],
+  "unknowns": string[]
+}
+
+Extract every visible completed game. Use ISO dates (YYYY-MM-DD) when readable.`;
+
+function isEmptyExtraction(extraction: AIExtractionResult): boolean {
+  const table = extraction.raw_extracted_table;
+  const hasTable = (table?.headers?.length ?? 0) > 0 || (table?.rows?.length ?? 0) > 0;
+  return (
+    !hasTable &&
+    extraction.players.length === 0 &&
+    extraction.batting_stats.length === 0 &&
+    extraction.pitching_stats.length === 0 &&
+    extraction.games.length === 0
+  );
+}
+
+async function extractScheduleFromScreenshot(
+  imageDataUrl: string,
+  priorWarnings: string[] = []
+): Promise<AIExtractionResult> {
+  let response;
+  try {
+    response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: SCHEDULE_EXTRACTION_PROMPT },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "This GameChanger screenshot may be a schedule or results list. Extract every visible game into the games array.",
+            },
+            {
+              type: "image_url",
+              image_url: { url: imageDataUrl, detail: "high" },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 4096,
+    });
+  } catch {
+    return enrichExtractionResult({
+      screenshot_type: "unknown",
+      team_name: null,
+      raw_extracted_table: { headers: [], rows: [] },
+      players: [],
+      batting_stats: [],
+      pitching_stats: [],
+      games: [],
+      warnings: priorWarnings,
+      unknowns: [],
+    });
+  }
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    return enrichExtractionResult({
+      screenshot_type: "unknown",
+      team_name: null,
+      raw_extracted_table: { headers: [], rows: [] },
+      players: [],
+      batting_stats: [],
+      pitching_stats: [],
+      games: [],
+      warnings: priorWarnings,
+      unknowns: [],
+    });
+  }
+
+  let parsed: AIExtractionResult;
+  try {
+    parsed = JSON.parse(content) as AIExtractionResult;
+  } catch {
+    return enrichExtractionResult({
+      screenshot_type: "unknown",
+      team_name: null,
+      raw_extracted_table: { headers: [], rows: [] },
+      players: [],
+      batting_stats: [],
+      pitching_stats: [],
+      games: [],
+      warnings: priorWarnings,
+      unknowns: [],
+    });
+  }
+
+  parsed.raw_extracted_table = parsed.raw_extracted_table ?? {
+    headers: [],
+    rows: [],
+  };
+  parsed.screenshot_type = "schedule_results";
+  parsed.warnings = [...priorWarnings, ...(parsed.warnings ?? [])];
 
   return enrichExtractionResult(parsed);
 }
@@ -243,7 +384,9 @@ Write practical advice for a youth baseball coach preparing to play this team.`,
     // Fall back to rule-based narratives if AI unavailable
   }
 
-  const reportJson = intelligenceToReportJson(intelligence, aiNarrative);
+  const reportJson = intelligenceToReportJson(intelligence, aiNarrative, {
+    pitchingStaffBreakdown: data.evidencePacket.pitchingStaffRead,
+  });
   const reportText = formatIntelligenceReportText(data.opponentName, reportJson);
 
   return { reportJson, reportText };

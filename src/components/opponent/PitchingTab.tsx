@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PitchingStatsTable } from "@/components/PitchingStatsTable";
-import { analyzePitchingStaff } from "@/lib/scouting/pitching-analysis";
+import {
+  analyzePitchingStaffFromDetail,
+} from "@/lib/scouting/pitching-analysis";
+import { getConsolidatedPitchingStats } from "@/lib/scouting/player-profiles";
 import { formatPercent } from "@/lib/utils";
 import type { OpponentDetail } from "@/types";
 
@@ -24,14 +27,9 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 }
 
 export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
-  const analyses = useMemo(
-    () =>
-      analyzePitchingStaff(
-        data.extracted_pitching_stats ?? [],
-        data.opponent_notes ?? [],
-        data.opponent_voice_notes ?? [],
-        data.opponent_game_context ?? []
-      ),
+  const analyses = useMemo(() => analyzePitchingStaffFromDetail(data), [data]);
+  const consolidatedStats = useMemo(
+    () => getConsolidatedPitchingStats(data),
     [data]
   );
 
@@ -74,7 +72,7 @@ export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
           <div className="space-y-4">
             <h3 className="font-semibold text-sm">Pitching Staff</h3>
             {analyses.map((p) => (
-              <Card key={p.label}>
+              <Card key={`${p.jerseyNumber ?? "x"}-${p.playerName ?? p.label}`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <CardTitle className="text-base">{p.label}</CardTitle>
@@ -124,7 +122,7 @@ export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
                   {p.evidence.length > 0 && (
                     <div>
                       <p className="font-medium text-xs text-muted-foreground mb-1">
-                        Supporting Notes
+                        Evidence Sources Used
                       </p>
                       <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
                         {p.evidence.slice(0, 4).map((e, i) => (
@@ -135,7 +133,7 @@ export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
                   )}
 
                   <p className="text-sm">
-                    <span className="font-medium">Coach Takeaway: </span>
+                    <span className="font-medium">How To Attack: </span>
                     {p.coachTakeaway}
                   </p>
                 </CardContent>
@@ -148,7 +146,7 @@ export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
               <CardTitle className="text-base">Pitching Stats</CardTitle>
             </CardHeader>
             <CardContent>
-              <PitchingStatsTable stats={data.extracted_pitching_stats ?? []} />
+              <PitchingStatsTable stats={consolidatedStats} />
             </CardContent>
           </Card>
         </>

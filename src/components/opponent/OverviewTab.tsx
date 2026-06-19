@@ -8,7 +8,8 @@ import { PlayerThreatCard } from "@/components/opponent/PlayerThreatCard";
 import { buildPlayerProfiles } from "@/lib/scouting/player-profiles";
 import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
 import { buildCoachTakeaways } from "@/lib/scouting/coach-takeaways";
-import { analyzePitchingStaff } from "@/lib/scouting/pitching-analysis";
+import { analyzePitchingStaffFromDetail } from "@/lib/scouting/pitching-analysis";
+import { GameDayCard } from "@/components/opponent/GameDayCard";
 import { scoutNotesCount } from "@/lib/scouting/evidence-timeline";
 import { buildRecentGames } from "@/lib/scouting/game-results";
 import { RecentGamesSection } from "@/components/opponent/RecentGamesSection";
@@ -16,6 +17,7 @@ import type { OpponentDetail } from "@/types";
 import { Check, ChevronRight, Target, Users } from "lucide-react";
 
 interface OverviewTabProps {
+  opponentName: string;
   data: OpponentDetail;
   onSwitchTab: (tab: string) => void;
 }
@@ -46,7 +48,7 @@ function ThreatCard({
     <div className="rounded-lg border bg-card px-3 py-2.5">
       <p className="text-[11px] text-muted-foreground">{title}</p>
       <p className="font-semibold text-sm mt-0.5">
-        {jersey ? `${jersey} ` : ""}
+        {jersey ? `#${jersey.replace(/^#/, "")} ` : ""}
         {name}
       </p>
       <p className="text-xs text-muted-foreground">{stat}</p>
@@ -71,19 +73,13 @@ function playerTier(
 
 const PREVIEW_COUNT = 8;
 
-export function OverviewTab({ data, onSwitchTab }: OverviewTabProps) {
+export function OverviewTab({ opponentName, data, onSwitchTab }: OverviewTabProps) {
   const [showAllPlayers, setShowAllPlayers] = useState(false);
 
   const profiles = useMemo(() => buildPlayerProfiles(data), [data]);
   const intelligence = useMemo(() => buildTeamIntelligence(data), [data]);
   const pitchingAnalyses = useMemo(
-    () =>
-      analyzePitchingStaff(
-        data.extracted_pitching_stats ?? [],
-        data.opponent_notes ?? [],
-        data.opponent_voice_notes ?? [],
-        data.opponent_game_context ?? []
-      ),
+    () => analyzePitchingStaffFromDetail(data),
     [data]
   );
   const takeaways = useMemo(
@@ -142,6 +138,8 @@ export function OverviewTab({ data, onSwitchTab }: OverviewTabProps) {
 
   return (
     <div className="space-y-5">
+      <GameDayCard opponentName={opponentName} data={data} report={null} />
+
       {/* Above the fold: 60-second coach view */}
       <Card>
         <CardContent className="py-4">

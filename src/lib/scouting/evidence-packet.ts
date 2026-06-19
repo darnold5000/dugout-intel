@@ -1,4 +1,8 @@
-import { analyzePitchingStaff, formatPitchingStaffRead } from "@/lib/scouting/pitching-analysis";
+import {
+  analyzePitchingStaffFromDetail,
+  formatPitchingStaffRead,
+  type PitcherAnalysis,
+} from "@/lib/scouting/pitching-analysis";
 import { getScoutNoteWeight } from "@/lib/scouting/evidence-timeline";
 import { buildGameResultsSummary } from "@/lib/scouting/game-results";
 import type { OpponentDetail } from "@/types";
@@ -64,7 +68,7 @@ export interface EvidencePacket {
     pitchingStats: unknown[];
     games: unknown[];
   };
-  pitchingAnalysis: ReturnType<typeof analyzePitchingStaff>;
+  pitchingAnalysis: PitcherAnalysis[];
   pitchingStaffRead: string;
   evidenceCounts: {
     screenshots: number;
@@ -100,7 +104,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       game_date: n.game_date,
       game_type: n.game_type,
       opponent_played: n.opponent_played ?? null,
-      weight: getScoutNoteWeight("note", n.game_type),
+      weight: getScoutNoteWeight("note", n.game_type, undefined, n.note_type),
     }));
 
   const voiceNotes = (data.opponent_voice_notes ?? [])
@@ -112,7 +116,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       game_type: v.game_type,
       game_date: v.game_date ?? null,
       opponent_played: v.opponent_played ?? null,
-      weight: getScoutNoteWeight("voice", v.game_type),
+      weight: getScoutNoteWeight("voice", v.game_type, undefined, v.note_type),
     }));
 
   const documents = (data.opponent_documents ?? [])
@@ -146,12 +150,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
 
   const gameResultsSummary = buildGameResultsSummary(data);
 
-  const pitchingAnalysis = analyzePitchingStaff(
-    data.extracted_pitching_stats ?? [],
-    data.opponent_notes ?? [],
-    data.opponent_voice_notes ?? [],
-    data.opponent_game_context ?? []
-  );
+  const pitchingAnalysis = analyzePitchingStaffFromDetail(data);
 
   return {
     screenshots,

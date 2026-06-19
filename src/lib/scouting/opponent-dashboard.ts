@@ -1,6 +1,6 @@
 import { parseBaseballInnings } from "@/lib/scouting/innings";
 import { evidenceSourceCount } from "@/lib/scouting/evidence-timeline";
-import { analyzePitchingStaff } from "@/lib/scouting/pitching-analysis";
+import { analyzePitchingStaffFromDetail } from "@/lib/scouting/pitching-analysis";
 import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
 import { formatDate } from "@/lib/utils";
 import type { OpponentDetail } from "@/types";
@@ -19,12 +19,7 @@ export function buildOpponentDashboardSummary(
   data: OpponentDetail
 ): OpponentDashboardSummary {
   const intelligence = buildTeamIntelligence(data);
-  const pitching = analyzePitchingStaff(
-    data.extracted_pitching_stats ?? [],
-    data.opponent_notes ?? [],
-    data.opponent_voice_notes ?? [],
-    data.opponent_game_context ?? []
-  );
+  const pitching = analyzePitchingStaffFromDetail(data);
 
   const topHitter =
     intelligence.offensiveLeaders.highest_ops ??

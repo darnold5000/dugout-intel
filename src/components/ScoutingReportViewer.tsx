@@ -223,8 +223,8 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
                   {card.assessment}
                 </p>
                 <p className="text-sm mt-1">
-                  <span className="font-medium">Game Plan: </span>
-                  {card.game_plan}
+                  <span className="font-medium">How To Attack: </span>
+                  {card.how_to_attack ?? card.game_plan}
                 </p>
               </div>
             ))}

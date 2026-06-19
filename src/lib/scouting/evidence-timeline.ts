@@ -69,10 +69,17 @@ const SCREENSHOT_TYPE_LABELS: Record<string, string> = {
 };
 
 function screenshotImportance(type: string | null | undefined): number {
-  if (type === "pitching_stats" || type === "box_score") return 5;
+  if (type === "pitching_stats" || type === "box_score") return 4;
   if (type === "batting_stats" || type === "game_summary") return 4;
-  if (type === "bracket_tournament" || type === "schedule_results") return 3;
+  if (type === "schedule_results" || type === "schedule") return 4;
+  if (type === "bracket_tournament") return 3;
+  if (type === "unknown") return 1;
   return 3;
+}
+
+function noteTypeImportance(noteType?: string | null): number | null {
+  if (noteType === "gamechanger_recap") return 5;
+  return null;
 }
 
 function gameTypeImportance(gameType?: string | null): number {
@@ -85,13 +92,18 @@ function gameTypeImportance(gameType?: string | null): number {
 function kindImportance(
   kind: EvidenceKind,
   gameType?: string | null,
-  screenshotType?: string | null
+  screenshotType?: string | null,
+  noteType?: string | null
 ): number {
+  const noteBoost = noteTypeImportance(noteType);
   if (kind === "screenshot") return screenshotImportance(screenshotType);
   if (kind === "game_context") return gameTypeImportance(gameType);
   if (kind === "note" || kind === "voice") {
+    if (noteBoost != null) return noteBoost;
     const base = gameTypeImportance(gameType);
-    return kind === "voice" ? Math.min(5, base + 1) : base === 2 ? 4 : base;
+    if (gameType === "pool_play") return 2;
+    if (kind === "voice") return Math.min(5, base + 1);
+    return base;
   }
   if (kind === "document") return 3;
   return 2;
@@ -100,9 +112,10 @@ function kindImportance(
 export function getScoutNoteWeight(
   kind: EvidenceKind,
   gameType?: string | null,
-  screenshotType?: string | null
+  screenshotType?: string | null,
+  noteType?: string | null
 ): number {
-  return kindImportance(kind, gameType, screenshotType);
+  return kindImportance(kind, gameType, screenshotType, noteType);
 }
 
 export function importanceStars(importance: number): string {
@@ -175,7 +188,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       gameType: note.game_type,
       opponentPlayed: note.opponent_played ?? undefined,
       includedInReport: note.included_in_report,
-      importance: kindImportance("note", note.game_type),
+      importance: kindImportance("note", note.game_type, undefined, note.note_type),
       note,
     });
   }
@@ -196,7 +209,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       gameType: voice.game_type,
       opponentPlayed: voice.opponent_played ?? undefined,
       includedInReport: voice.included_in_report,
-      importance: kindImportance("voice", voice.game_type),
+      importance: kindImportance("voice", voice.game_type, undefined, voice.note_type),
       voice,
     });
   }

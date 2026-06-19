@@ -73,7 +73,11 @@ export function OpponentWorkspace({
         </div>
 
         <TabsContent value="overview">
-          <OverviewTab data={data} onSwitchTab={setActiveTab} />
+          <OverviewTab
+            opponentName={data.name}
+            data={data}
+            onSwitchTab={setActiveTab}
+          />
         </TabsContent>
 
         <TabsContent value="scout-notes">

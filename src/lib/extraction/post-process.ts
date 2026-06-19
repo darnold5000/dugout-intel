@@ -430,29 +430,62 @@ export function normalizeScreenshotType(type: string | null | undefined): Screen
   }
 }
 
+function isScheduleLikeType(type: ScreenshotType): boolean {
+  return (
+    type === "schedule_results" ||
+    type === "schedule" ||
+    type === "box_score" ||
+    type === "game_summary"
+  );
+}
+
+function hasExtractedGames(extraction: AIExtractionResult): boolean {
+  return extraction.games.some(
+    (game) =>
+      game.opponent_name ||
+      game.game_date ||
+      game.result ||
+      game.runs_for != null ||
+      game.runs_against != null
+  );
+}
+
 export function enrichExtractionResult(
   extraction: AIExtractionResult
 ): AIExtractionResult {
   const table = extraction.raw_extracted_table;
   const warnings = [...(extraction.warnings ?? [])];
+  let screenshotType = normalizeScreenshotType(extraction.screenshot_type);
 
-  if (!table?.headers?.length) {
-    warnings.push("Table headers missing — stat columns may not have been captured.");
-  } else if (table.headers.length > 0 && table.rows.length === 0) {
-    warnings.push("Column headers detected but no player rows were extracted.");
+  if (hasExtractedGames(extraction) && screenshotType === "unknown") {
+    screenshotType = "schedule_results";
   }
 
-  if (table && tableOnlyHasNames(table)) {
-    warnings.push("Only player names appear readable — stat columns may be cropped, blurry, or too small.");
-  }
+  const scheduleLike = isScheduleLikeType(screenshotType);
+  const gamesExtracted = hasExtractedGames(extraction);
 
-  if (table && !tableHasNumericColumns(table)) {
-    warnings.push("No numeric stat columns detected in raw_extracted_table.");
+  if (!scheduleLike || !gamesExtracted) {
+    if (!table?.headers?.length) {
+      warnings.push(
+        "Table headers missing — stat columns may not have been captured."
+      );
+    } else if (table.headers.length > 0 && table.rows.length === 0) {
+      warnings.push("Column headers detected but no player rows were extracted.");
+    }
+
+    if (table && tableOnlyHasNames(table)) {
+      warnings.push(
+        "Only player names appear readable — stat columns may be cropped, blurry, or too small."
+      );
+    }
+
+    if (table && !tableHasNumericColumns(table)) {
+      warnings.push("No numeric stat columns detected in raw_extracted_table.");
+    }
   }
 
   let battingStats = [...extraction.batting_stats];
   let pitchingStats = [...extraction.pitching_stats];
-  let screenshotType = normalizeScreenshotType(extraction.screenshot_type);
 
   if (table?.headers?.length && table.rows?.length) {
     const tableKind = inferTableKind(table.headers);
@@ -492,11 +525,21 @@ export function enrichExtractionResult(
     );
   }
 
+  const dedupedWarnings = [...new Set(warnings)].filter((warning) => {
+    if (!scheduleLike || !gamesExtracted) return true;
+    const lower = warning.toLowerCase();
+    return (
+      !lower.includes("does not contain tabular data") &&
+      !lower.includes("table headers missing") &&
+      !lower.includes("no numeric stat columns")
+    );
+  });
+
   return {
     ...extraction,
     screenshot_type: screenshotType,
     batting_stats: battingStats,
     pitching_stats: pitchingStats,
-    warnings: [...new Set(warnings)],
+    warnings: dedupedWarnings,
   };
 }
