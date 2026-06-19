@@ -1,6 +1,7 @@
 import {
   applyBoxScorePitchingSupplements,
 } from "@/lib/extraction/box-score-pitching";
+import { filterExtractionByOpponent } from "@/lib/extraction/filter-extraction-by-opponent";
 import type {
   AIExtractionResult,
   RawExtractedTable,
@@ -469,7 +470,8 @@ function hasExtractedGames(extraction: AIExtractionResult): boolean {
 }
 
 export function enrichExtractionResult(
-  extraction: AIExtractionResult
+  extraction: AIExtractionResult,
+  options?: { opponentName?: string | null }
 ): AIExtractionResult {
   const table = extraction.raw_extracted_table;
   const warnings = [...(extraction.warnings ?? [])];
@@ -565,11 +567,13 @@ export function enrichExtractionResult(
     );
   });
 
-  return {
+  const enriched: AIExtractionResult = {
     ...extraction,
     screenshot_type: screenshotType,
     batting_stats: battingStats,
     pitching_stats: pitchingStats,
     warnings: dedupedWarnings,
   };
+
+  return filterExtractionByOpponent(enriched, options?.opponentName);
 }

@@ -202,7 +202,6 @@ function buildOffensiveLeaders(
   const byRbi = sortByDesc(withBatting, (p) => p.batting?.rbi ?? null);
   const byRuns = sortByDesc(withBatting, (p) => p.batting?.runs ?? null);
   const byWalks = sortByDesc(withBatting, (p) => p.batting?.walks ?? null);
-  const bySb = sortByDesc(withBatting, (p) => p.batting?.stolen_bases ?? null);
   const byFewestK = [...withBatting].sort(
     (a, b) => (a.batting?.strikeouts ?? 999) - (b.batting?.strikeouts ?? 999)
   );

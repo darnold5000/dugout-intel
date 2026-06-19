@@ -19,10 +19,6 @@ interface BattersFacedEntry {
   batters_faced: number;
 }
 
-function normalizeNameKey(name: string): string {
-  return parsePlayerIdentity(name, null).player_name?.toLowerCase() ?? "";
-}
-
 function rowsMatchPitcher(
   a: { player_name: string | null; jersey_number?: string | null },
   b: { player_name: string | null; jersey_number?: string | null }

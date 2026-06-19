@@ -34,7 +34,7 @@ export async function POST(
 
   const { data: opponent } = await supabase
     .from("opponents")
-    .select("id")
+    .select("id, name")
     .eq("id", opponentId)
     .eq("user_id", user.id)
     .single();
@@ -102,7 +102,9 @@ export async function POST(
       }
 
       const imageDataUrl = await fileToDataUrl(fileBlob);
-      const extraction = await extractFromScreenshot(imageDataUrl);
+      const extraction = await extractFromScreenshot(imageDataUrl, {
+        opponentName: opponent.name,
+      });
 
       freshExtractions.set(upload.id, extraction);
 

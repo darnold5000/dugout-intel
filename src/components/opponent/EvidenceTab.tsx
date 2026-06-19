@@ -35,7 +35,6 @@ import {
 } from "@/lib/scouting/game-results";
 import { RecentGamesSection } from "@/components/opponent/RecentGamesSection";
 import { inferNoteTypeFromText } from "@/lib/scouting/recap-extraction";
-import { formatDate } from "@/lib/utils";
 import type {
   ExtractionResult,
   ExtractionSummary,

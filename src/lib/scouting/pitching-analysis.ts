@@ -1,6 +1,5 @@
 import { parseBaseballInnings, formatBaseballInnings } from "@/lib/scouting/innings";
 import {
-  buildPlayerProfiles,
   formatPlayerDisplayLabel,
   getConsolidatedPitchingStats,
 } from "@/lib/scouting/player-profiles";

@@ -1,4 +1,3 @@
-import { parseBaseballInnings } from "@/lib/scouting/innings";
 import type { PitcherAnalysis } from "@/lib/scouting/pitching-analysis";
 import type { TeamIntelligence } from "@/types";
 import type { OpponentDetail } from "@/types";

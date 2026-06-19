@@ -111,6 +111,13 @@ Schedule and results views are often vertical LISTS, not stat tables.
 - Do NOT return screenshot_type unknown for a readable schedule/results list.
 - Do NOT warn "screenshot does not contain tabular data" when games were extracted from a schedule view.
 
+DUAL-TEAM SCREENSHOTS (CRITICAL):
+Box scores and stat screens often show TWO teams (side-by-side columns or stacked sections).
+When an opponent team name is provided in the user message, extract ONLY that opponent's players and stats.
+Set team_name to the scouting opponent name.
+Do NOT mix players or stats from the other team into batting_stats, pitching_stats, or players.
+In raw_extracted_table, include only rows for the scouting opponent (plus their pitching footer lines).
+
 Return ONLY valid JSON matching this schema:
 {
   "screenshot_type": "roster | batting_stats | pitching_stats | schedule_results | box_score | unknown",
@@ -162,8 +169,30 @@ Return ONLY valid JSON:
   "suggested_game_plan": string (what OUR team should do — actionable pre-game plan in 3-5 bullet points as prose)
 }`;
 
+export interface ExtractScreenshotOptions {
+  opponentName?: string | null;
+}
+
+function buildExtractionUserPrompt(opponentName?: string | null): string {
+  const base =
+    "Extract all baseball data from this screenshot. If this is a stat table, capture exact column headers in raw_extracted_table and map rows into batting_stats or pitching_stats. If this is a schedule/results list, set screenshot_type to schedule_results and populate the games array (opponent, date, W/L, score). Return structured JSON only.";
+
+  const trimmed = opponentName?.trim();
+  if (!trimmed) return base;
+
+  return `${base}
+
+OPPONENT TEAM FILTER (CRITICAL):
+You are extracting data for the scouting opponent: "${trimmed}"
+When this screenshot shows two teams, extract ONLY players and stats for "${trimmed}".
+Set team_name to "${trimmed}".
+Do NOT include batting_stats, pitching_stats, or players from the other team.
+In raw_extracted_table, include only the table section and footer lines for "${trimmed}".`;
+}
+
 export async function extractFromScreenshot(
-  imageDataUrl: string
+  imageDataUrl: string,
+  options?: ExtractScreenshotOptions
 ): Promise<AIExtractionResult> {
   let response;
   try {
@@ -176,7 +205,7 @@ export async function extractFromScreenshot(
           content: [
             {
               type: "text",
-              text: "Extract all baseball data from this screenshot. If this is a stat table, capture exact column headers in raw_extracted_table and map rows into batting_stats or pitching_stats. If this is a schedule/results list, set screenshot_type to schedule_results and populate the games array (opponent, date, W/L, score). Return structured JSON only.",
+              text: buildExtractionUserPrompt(options?.opponentName),
             },
             {
               type: "image_url",
@@ -211,12 +240,18 @@ export async function extractFromScreenshot(
     rows: [],
   };
 
-  const enriched = enrichExtractionResult(parsed);
+  const enriched = enrichExtractionResult(parsed, {
+    opponentName: options?.opponentName,
+  });
   if (!isEmptyExtraction(enriched)) {
     return enriched;
   }
 
-  return extractScheduleFromScreenshot(imageDataUrl, enriched.warnings);
+  return extractScheduleFromScreenshot(
+    imageDataUrl,
+    enriched.warnings,
+    options?.opponentName
+  );
 }
 
 const SCHEDULE_EXTRACTION_PROMPT = `You extract game results from schedule or results screenshots.
@@ -253,8 +288,10 @@ function isEmptyExtraction(extraction: AIExtractionResult): boolean {
 
 async function extractScheduleFromScreenshot(
   imageDataUrl: string,
-  priorWarnings: string[] = []
+  priorWarnings: string[] = [],
+  opponentName?: string | null
 ): Promise<AIExtractionResult> {
+  const enrichOpts = { opponentName };
   let response;
   try {
     response = await getOpenAI().chat.completions.create({
@@ -289,7 +326,7 @@ async function extractScheduleFromScreenshot(
       games: [],
       warnings: priorWarnings,
       unknowns: [],
-    });
+    }, enrichOpts);
   }
 
   const content = response.choices[0]?.message?.content;
@@ -304,7 +341,7 @@ async function extractScheduleFromScreenshot(
       games: [],
       warnings: priorWarnings,
       unknowns: [],
-    });
+    }, enrichOpts);
   }
 
   let parsed: AIExtractionResult;
@@ -321,7 +358,7 @@ async function extractScheduleFromScreenshot(
       games: [],
       warnings: priorWarnings,
       unknowns: [],
-    });
+    }, enrichOpts);
   }
 
   parsed.raw_extracted_table = parsed.raw_extracted_table ?? {
@@ -331,7 +368,7 @@ async function extractScheduleFromScreenshot(
   parsed.screenshot_type = "schedule_results";
   parsed.warnings = [...priorWarnings, ...(parsed.warnings ?? [])];
 
-  return enrichExtractionResult(parsed);
+  return enrichExtractionResult(parsed, enrichOpts);
 }
 
 export async function generateScoutingReport(data: {
