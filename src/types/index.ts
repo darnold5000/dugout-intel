@@ -142,6 +142,9 @@ export interface OpponentGameContext {
   reason_pitcher_entered: ReasonPitcherEntered | string;
   leverage: Leverage | string;
   notes: string | null;
+  result: string | null;
+  runs_for: number | null;
+  runs_against: number | null;
   included_in_report: boolean;
   created_at: string;
   updated_at: string;

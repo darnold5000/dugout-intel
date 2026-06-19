@@ -88,6 +88,18 @@ export function buildCoachTakeaways(
     );
   }
 
+  const recentWins = (data.extracted_games ?? []).filter((g) =>
+    g.result?.toLowerCase().startsWith("w")
+  ).length;
+  const recentLosses = (data.extracted_games ?? []).filter((g) =>
+    g.result?.toLowerCase().startsWith("l")
+  ).length;
+  if (recentWins + recentLosses > 0) {
+    takeaways.push(
+      `Recent record from screenshots: ${recentWins}-${recentLosses} (W-L).`
+    );
+  }
+
   if (takeaways.length === 0 && intelligence.dataGaps.length > 0) {
     takeaways.push("Add scout notes or box scores to build coach takeaways.");
   }

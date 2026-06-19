@@ -27,6 +27,13 @@ import {
   type EvidenceKind,
   type EvidenceLibraryItem,
 } from "@/lib/scouting/evidence-timeline";
+import {
+  buildRecentGames,
+  findMatchingExtractedGame,
+  formatGameScoreLine,
+  resolveGameScore,
+} from "@/lib/scouting/game-results";
+import { RecentGamesSection } from "@/components/opponent/RecentGamesSection";
 import { formatDate } from "@/lib/utils";
 import type {
   ExtractionResult,
@@ -132,6 +139,9 @@ export function ScoutNotesTab({
     leverage: "medium",
     inning_observed: "",
     notes: "",
+    result: "",
+    runs_for: "",
+    runs_against: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -157,6 +167,22 @@ export function ScoutNotesTab({
     () => library.filter((i) => i.kind === "screenshot" && i.screenshot),
     [library]
   );
+  const recentGames = useMemo(() => buildRecentGames(data), [data]);
+
+  const matchedExtractedGame = useMemo(() => {
+    if (!context.game_date && !context.opponent_played) return null;
+    return findMatchingExtractedGame(
+      data.extracted_games ?? [],
+      context.game_date || null,
+      context.opponent_played || null
+    );
+  }, [data.extracted_games, context.game_date, context.opponent_played]);
+
+  const matchedScoreLine = useMemo(() => {
+    if (context.result || context.runs_for || context.runs_against) return null;
+    if (!matchedExtractedGame) return null;
+    return formatGameScoreLine(resolveGameScore(data, context.game_date, context.opponent_played));
+  }, [context, data, matchedExtractedGame]);
 
   const pendingUploads = useMemo(
     () =>
@@ -258,6 +284,9 @@ export function ScoutNotesTab({
         inning_observed: context.inning_observed || null,
         leverage: context.leverage,
         notes: context.notes || composerText.trim() || null,
+        result: context.result || null,
+        runs_for: context.runs_for ? Number(context.runs_for) : null,
+        runs_against: context.runs_against ? Number(context.runs_against) : null,
         reason_pitcher_entered: "unknown",
       }),
     });
@@ -325,7 +354,10 @@ export function ScoutNotesTab({
         context.game_type !== "unknown" ||
         context.leverage !== "medium" ||
         context.inning_observed ||
-        context.notes);
+        context.notes ||
+        context.result ||
+        context.runs_for ||
+        context.runs_against);
 
     if (!text && !attachedFiles.length && !hasContext) return;
 
@@ -336,10 +368,15 @@ export function ScoutNotesTab({
 
       if (
         hasContext &&
-        (context.leverage !== "medium" ||
+        (context.game_date ||
+          context.opponent_played ||
+          context.leverage !== "medium" ||
           context.inning_observed ||
           context.tournament_name ||
-          context.notes)
+          context.notes ||
+          context.result ||
+          context.runs_for ||
+          context.runs_against)
       ) {
         await saveGameContext();
       }
@@ -360,6 +397,9 @@ export function ScoutNotesTab({
         leverage: "medium",
         inning_observed: "",
         notes: "",
+        result: "",
+        runs_for: "",
+        runs_against: "",
       });
       setShowContext(false);
       await onRefresh();
@@ -733,6 +773,56 @@ export function ScoutNotesTab({
                   placeholder="e.g. BAM"
                 />
               </div>
+              {matchedScoreLine && (
+                <div className="sm:col-span-2 rounded-md bg-muted/60 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Matched game: </span>
+                  <span className="font-medium">{matchedScoreLine}</span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    (from schedule screenshot)
+                  </span>
+                </div>
+              )}
+              <div className="sm:col-span-2 grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Result</Label>
+                  <select
+                    value={context.result}
+                    onChange={(e) =>
+                      setContext({ ...context, result: e.target.value })
+                    }
+                    className="w-full text-sm rounded-md border px-2 py-2 h-9"
+                  >
+                    <option value="">—</option>
+                    <option value="W">Win</option>
+                    <option value="L">Loss</option>
+                    <option value="T">Tie</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs">Runs For</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={context.runs_for}
+                    onChange={(e) =>
+                      setContext({ ...context, runs_for: e.target.value })
+                    }
+                    placeholder="8"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Runs Against</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={context.runs_against}
+                    onChange={(e) =>
+                      setContext({ ...context, runs_against: e.target.value })
+                    }
+                    placeholder="3"
+                  />
+                </div>
+              </div>
               <div className="sm:col-span-2">
                 <Label className="text-xs">Tournament</Label>
                 <Input
@@ -832,8 +922,19 @@ export function ScoutNotesTab({
         <p className="text-xs text-muted-foreground">
           Extracted {extractionSummary.players} players,{" "}
           {extractionSummary.batting_stats} batting rows,{" "}
-          {extractionSummary.pitching_stats} pitching rows.
+          {extractionSummary.pitching_stats} pitching rows
+          {extractionSummary.games > 0
+            ? `, ${extractionSummary.games} game result(s)`
+            : ""}
+          .
         </p>
+      )}
+
+      {recentGames.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold mb-3">Recent Games</h2>
+          <RecentGamesSection games={recentGames} />
+        </section>
       )}
 
       {timeline.length > 0 && (
@@ -844,7 +945,10 @@ export function ScoutNotesTab({
               <div key={group.key} className="relative pl-4 border-l-2 border-muted">
                 <div className="mb-2">
                   <p className="font-medium text-sm">{group.heading}</p>
-                  <p className="text-xs text-muted-foreground">{group.subtitle}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {group.subtitle}
+                    {group.scoreLine ? ` · ${group.scoreLine}` : ""}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   {group.items.map((item) => (

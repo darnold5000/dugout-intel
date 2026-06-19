@@ -26,6 +26,9 @@ export async function PUT(
     "reason_pitcher_entered",
     "leverage",
     "notes",
+    "result",
+    "runs_for",
+    "runs_against",
     "included_in_report",
   ];
   const updates: Record<string, unknown> = {};

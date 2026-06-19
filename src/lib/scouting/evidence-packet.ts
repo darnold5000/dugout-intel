@@ -1,5 +1,6 @@
 import { analyzePitchingStaff, formatPitchingStaffRead } from "@/lib/scouting/pitching-analysis";
 import { getScoutNoteWeight } from "@/lib/scouting/evidence-timeline";
+import { buildGameResultsSummary } from "@/lib/scouting/game-results";
 import type { OpponentDetail } from "@/types";
 
 export interface EvidencePacket {
@@ -51,8 +52,12 @@ export interface EvidencePacket {
     reason_pitcher_entered: string | null;
     leverage: string | null;
     notes: string | null;
+    result: string | null;
+    runs_for: number | null;
+    runs_against: number | null;
     weight: number;
   }[];
+  gameResultsSummary: string[];
   consolidatedStats: {
     players: unknown[];
     battingStats: unknown[];
@@ -133,8 +138,13 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       reason_pitcher_entered: g.reason_pitcher_entered,
       leverage: g.leverage,
       notes: g.notes,
+      result: g.result ?? null,
+      runs_for: g.runs_for ?? null,
+      runs_against: g.runs_against ?? null,
       weight: getScoutNoteWeight("game_context", g.game_type),
     }));
+
+  const gameResultsSummary = buildGameResultsSummary(data);
 
   const pitchingAnalysis = analyzePitchingStaff(
     data.extracted_pitching_stats ?? [],
@@ -149,6 +159,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
     voiceNotes,
     documents,
     gameContexts,
+    gameResultsSummary,
     consolidatedStats: {
       players: data.extracted_players ?? [],
       battingStats: data.extracted_batting_stats ?? [],

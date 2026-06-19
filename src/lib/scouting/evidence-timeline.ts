@@ -1,4 +1,9 @@
 import { formatDate } from "@/lib/utils";
+import {
+  formatGameScoreLine,
+  resolveGameScore,
+  resolveTimelineGroupScore,
+} from "@/lib/scouting/game-results";
 import type {
   OpponentDetail,
   OpponentDocument,
@@ -38,6 +43,7 @@ export interface EvidenceTimelineGroup {
   key: string;
   heading: string;
   subtitle: string;
+  scoreLine: string | null;
   items: EvidenceLibraryItem[];
 }
 
@@ -130,11 +136,19 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
 
   for (const upload of data.screenshot_uploads ?? []) {
     const type = upload.screenshot_type ?? "unknown";
+    const scoreLine = formatGameScoreLine(
+      resolveGameScore(data, upload.game_date, upload.opponent_played)
+    );
     items.push({
       id: upload.id,
       kind: "screenshot",
       title: SCREENSHOT_TYPE_LABELS[type] ?? "Screenshot",
-      subtitle: upload.game_date ? formatDate(upload.game_date) : formatDate(upload.created_at),
+      subtitle: [
+        upload.game_date ? formatDate(upload.game_date) : formatDate(upload.created_at),
+        scoreLine,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       date: sortKey(upload.game_date, upload.created_at),
       gameType: upload.game_type ?? undefined,
       tournamentName: upload.tournament_name ?? undefined,
@@ -146,12 +160,17 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
   }
 
   for (const note of data.opponent_notes ?? []) {
+    const scoreLine = formatGameScoreLine(
+      resolveGameScore(data, note.game_date, note.opponent_played)
+    );
     items.push({
       id: note.id,
       kind: "note",
       title: "Coach Note",
       preview: note.note_text,
-      subtitle: formatDate(note.game_date ?? note.created_at),
+      subtitle: [formatDate(note.game_date ?? note.created_at), scoreLine]
+        .filter(Boolean)
+        .join(" · "),
       date: sortKey(note.game_date, note.created_at),
       gameType: note.game_type,
       opponentPlayed: note.opponent_played ?? undefined,
@@ -162,12 +181,17 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
   }
 
   for (const voice of data.opponent_voice_notes ?? []) {
+    const scoreLine = formatGameScoreLine(
+      resolveGameScore(data, voice.game_date, voice.opponent_played)
+    );
     items.push({
       id: voice.id,
       kind: "voice",
       title: "Voice Note",
       preview: voice.transcript_text ?? undefined,
-      subtitle: formatDate(voice.game_date ?? voice.created_at),
+      subtitle: [formatDate(voice.game_date ?? voice.created_at), scoreLine]
+        .filter(Boolean)
+        .join(" · "),
       date: sortKey(voice.game_date, voice.created_at),
       gameType: voice.game_type,
       opponentPlayed: voice.opponent_played ?? undefined,
@@ -192,12 +216,16 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
   }
 
   for (const ctx of data.opponent_game_context ?? []) {
+    const score = resolveGameScore(data, ctx.game_date, ctx.opponent_played, ctx);
+    const scoreLine = formatGameScoreLine(score);
     items.push({
       id: ctx.id,
       kind: "game_context",
       title: "Game Context",
       preview: ctx.notes ?? undefined,
-      subtitle: formatDate(ctx.game_date ?? ctx.created_at),
+      subtitle: [formatDate(ctx.game_date ?? ctx.created_at), scoreLine]
+        .filter(Boolean)
+        .join(" · "),
       date: sortKey(ctx.game_date, ctx.created_at),
       gameType: ctx.game_type,
       tournamentName: ctx.tournament_name ?? undefined,
@@ -225,6 +253,12 @@ export function buildEvidenceTimeline(
     ].join("|");
 
     if (!groups.has(key)) {
+      const { scoreLine } = resolveTimelineGroupScore(
+        data,
+        item.date,
+        item.opponentPlayed ?? null,
+        data.opponent_game_context ?? []
+      );
       groups.set(key, {
         key,
         heading: item.date ? formatDate(item.date) : "Undated",
@@ -233,6 +267,7 @@ export function buildEvidenceTimeline(
           item.opponentPlayed,
           item.tournamentName
         ),
+        scoreLine,
         items: [],
       });
     }

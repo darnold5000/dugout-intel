@@ -10,6 +10,8 @@ import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
 import { buildCoachTakeaways } from "@/lib/scouting/coach-takeaways";
 import { analyzePitchingStaff } from "@/lib/scouting/pitching-analysis";
 import { scoutNotesCount } from "@/lib/scouting/evidence-timeline";
+import { buildRecentGames } from "@/lib/scouting/game-results";
+import { RecentGamesSection } from "@/components/opponent/RecentGamesSection";
 import type { OpponentDetail } from "@/types";
 import { Check, ChevronRight, Target, Users } from "lucide-react";
 
@@ -88,6 +90,7 @@ export function OverviewTab({ data, onSwitchTab }: OverviewTabProps) {
     () => buildCoachTakeaways(data, intelligence, pitchingAnalyses),
     [data, intelligence, pitchingAnalyses]
   );
+  const recentGames = useMemo(() => buildRecentGames(data), [data]);
 
   const pitchersWithStats = profiles.filter(
     (p) => p.pitching?.innings_pitched != null
@@ -208,6 +211,15 @@ export function OverviewTab({ data, onSwitchTab }: OverviewTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {(recentGames.length > 0 || data.screenshot_uploads.length > 0) && (
+        <section>
+          <h3 className="text-xs font-semibold text-muted-foreground mb-2">
+            Recent Games
+          </h3>
+          <RecentGamesSection games={recentGames} />
+        </section>
+      )}
 
       {/* Pitching before players */}
       {pitchingAnalyses.length > 0 && (

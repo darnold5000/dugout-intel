@@ -42,6 +42,15 @@ export async function POST(
       reason_pitcher_entered: body.reason_pitcher_entered ?? "unknown",
       leverage: body.leverage ?? "medium",
       notes: body.notes || null,
+      result: body.result || null,
+      runs_for:
+        body.runs_for != null && body.runs_for !== ""
+          ? Number(body.runs_for)
+          : null,
+      runs_against:
+        body.runs_against != null && body.runs_against !== ""
+          ? Number(body.runs_against)
+          : null,
       included_in_report: body.included_in_report ?? true,
     })
     .select()

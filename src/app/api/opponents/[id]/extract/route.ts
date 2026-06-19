@@ -123,6 +123,25 @@ export async function POST(
           extraction_error: null,
           raw_extracted_table: extraction.raw_extracted_table,
           extraction_warnings: extraction.warnings,
+          ...(extraction.games.length > 0
+            ? (() => {
+                const primary = extraction.games.find(
+                  (g) => g.game_date || g.opponent_name
+                );
+                if (!primary) return {};
+                const type = normalizeScreenshotType(extraction.screenshot_type);
+                const isGameShot =
+                  type === "schedule_results" ||
+                  type === "schedule" ||
+                  type === "box_score" ||
+                  type === "game_summary";
+                if (!isGameShot) return {};
+                return {
+                  game_date: primary.game_date?.slice(0, 10) ?? null,
+                  opponent_played: primary.opponent_name ?? null,
+                };
+              })()
+            : {}),
         })
         .eq("id", upload.id);
 
