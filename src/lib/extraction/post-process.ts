@@ -2,6 +2,7 @@ import {
   applyBoxScorePitchingSupplements,
 } from "@/lib/extraction/box-score-pitching";
 import { filterExtractionByOpponent } from "@/lib/extraction/filter-extraction-by-opponent";
+import { enrichPitchingStatRow } from "@/lib/scouting/pitching-derived";
 import type {
   AIExtractionResult,
   RawExtractedTable,
@@ -539,6 +540,8 @@ export function enrichExtractionResult(
   }
 
   pitchingStats = applyBoxScorePitchingSupplements(pitchingStats, table);
+
+  pitchingStats = pitchingStats.map((row) => enrichPitchingStatRow(row));
 
   if (
     screenshotType === "box_score" ||

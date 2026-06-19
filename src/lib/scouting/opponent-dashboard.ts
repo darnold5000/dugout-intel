@@ -1,6 +1,10 @@
 import { parseBaseballInnings } from "@/lib/scouting/innings";
 import { evidenceSourceCount } from "@/lib/scouting/evidence-timeline";
 import { analyzePitchingStaffFromDetail } from "@/lib/scouting/pitching-analysis";
+import {
+  resolveBestHitterPick,
+  resolveBestRunnerPick,
+} from "@/lib/scouting/offensive-leaders";
 import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
 import { formatDate } from "@/lib/utils";
 import type { OpponentDetail } from "@/types";
@@ -21,14 +25,14 @@ export function buildOpponentDashboardSummary(
   const intelligence = buildTeamIntelligence(data);
   const pitching = analyzePitchingStaffFromDetail(data);
 
-  const topHitter =
-    intelligence.offensiveLeaders.highest_ops ??
-    intelligence.offensiveLeaders.highest_avg;
+  const topHitterPick = resolveBestHitterPick(intelligence.profiles);
+  const topRunnerPick = resolveBestRunnerPick(intelligence.profiles);
   const topPitcher = intelligence.pitchingLeaders.ace_pitcher;
-  const topRunner = intelligence.offensiveLeaders.most_stolen_bases;
 
-  const formatPlayer = (jersey: string | null, name: string) =>
-    jersey ? `#${jersey} ${name}` : name;
+  const formatPlayer = (jersey: string | null, name: string, stat?: string) => {
+    const label = jersey ? `#${jersey} ${name}` : name;
+    return stat ? `${label} (${stat})` : label;
+  };
 
   const tier1Count = intelligence.lineupThreatTiers.tier_1.length;
   const hasAce = pitching.some((p) =>
@@ -53,17 +57,20 @@ export function buildOpponentDashboardSummary(
     primaryPitcher: topPitcher
       ? formatPlayer(topPitcher.jersey_number, topPitcher.player_name)
       : pitching[0]?.label ?? null,
-    bestHitter: topHitter
-      ? formatPlayer(topHitter.jersey_number, topHitter.player_name)
+    bestHitter: topHitterPick?.jersey_number
+      ? formatPlayer(
+          topHitterPick.jersey_number,
+          topHitterPick.player_name,
+          topHitterPick.stat_line
+        )
       : null,
-    bestRunner:
-      topRunner &&
-      (topRunner.stat_line.includes("SB") ||
-        (data.extracted_batting_stats.find(
-          (s) => s.player_name === topRunner.player_name
-        )?.stolen_bases ?? 0) > 0)
-        ? formatPlayer(topRunner.jersey_number, topRunner.player_name)
-        : null,
+    bestRunner: topRunnerPick?.jersey_number
+      ? formatPlayer(
+          topRunnerPick.jersey_number,
+          topRunnerPick.player_name,
+          topRunnerPick.stat_line
+        )
+      : null,
     pitchingDepth:
       intelligence.teamIdentity?.pitching_depth ?? "Unknown",
     lastScouted,

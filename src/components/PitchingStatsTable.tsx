@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { deriveBattersFaced, enrichPitchingStatForDisplay } from "@/lib/scouting/pitching-derived";
 import { StatsLegend } from "@/components/StatsLegend";
 import { formatPercent, formatStat } from "@/lib/utils";
 import { PITCHING_STAT_TERMS, pickLegendTerms } from "@/lib/stat-legend";
@@ -87,9 +88,14 @@ export function PitchingStatsTable({
   const [sortAsc, setSortAsc] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const enrichedStats = useMemo(
+    () => stats.map(enrichPitchingStatForDisplay),
+    [stats]
+  );
+
   const filtered = useMemo(
-    () => (showAll ? stats : stats.filter(hasPitchingData)),
-    [stats, showAll]
+    () => (showAll ? enrichedStats : enrichedStats.filter(hasPitchingData)),
+    [enrichedStats, showAll]
   );
 
   const showJersey = filtered.some((s) => s.jersey_number);
@@ -97,7 +103,7 @@ export function PitchingStatsTable({
   const showPitchStrikes = filtered.some((s) => pitchStrikesLine(s) != null);
   const showP =
     filtered.some((s) => pitchCount(s) != null) && !showPitchStrikes;
-  const showBf = filtered.some((s) => s.batters_faced != null);
+  const showBf = filtered.some((s) => deriveBattersFaced(s) != null);
   const showBalls = filtered.some((s) => derivedBalls(s) != null);
   const showFps = filtered.some((s) => s.first_pitch_strike_pct != null);
   const showEra = filtered.some((s) => s.era != null);
@@ -348,7 +354,7 @@ export function PitchingStatsTable({
                   <td className="py-2 pr-3">{pitchStrikesLine(stat) ?? "—"}</td>
                 )}
                 {showBf && (
-                  <td className="py-2 pr-3">{stat.batters_faced ?? "—"}</td>
+                  <td className="py-2 pr-3">{deriveBattersFaced(stat) ?? "—"}</td>
                 )}
                 {showBalls && (
                   <td className="py-2 pr-3">{derivedBalls(stat) ?? "—"}</td>

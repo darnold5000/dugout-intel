@@ -16,10 +16,12 @@ interface GameDayCardProps {
 function SummaryRow({
   label,
   value,
+  statBasis,
   confidence,
 }: {
   label: string;
   value: string;
+  statBasis?: string;
   confidence?: string;
 }) {
   return (
@@ -28,6 +30,9 @@ function SummaryRow({
         {label}
       </p>
       <p className="font-semibold">{value}</p>
+      {statBasis && (
+        <p className="text-xs text-muted-foreground">Based on {statBasis}</p>
+      )}
       {confidence && (
         <p className="text-xs text-muted-foreground">Confidence: {confidence}</p>
       )}
@@ -79,6 +84,7 @@ export function GameDayCard({ opponentName, data, report }: GameDayCardProps) {
             <SummaryRow
               label={summary.bestHitter.label}
               value={summary.bestHitter.value}
+              statBasis={summary.bestHitter.statBasis}
               confidence={summary.bestHitter.confidence}
             />
           )}
@@ -93,6 +99,7 @@ export function GameDayCard({ opponentName, data, report }: GameDayCardProps) {
             <SummaryRow
               label={summary.bestRunner.label}
               value={summary.bestRunner.value}
+              statBasis={summary.bestRunner.statBasis}
             />
           )}
           <SummaryRow

@@ -20,6 +20,7 @@ import type { OpponentDetail } from "@/types";
 export interface GameDaySummaryLine {
   label: string;
   value: string;
+  statBasis?: string;
   confidence?: string;
 }
 
@@ -94,24 +95,26 @@ export function buildGameDaySummary(
 
   return {
     opponentName,
-    bestHitter: bestHitterLeader
+    bestHitter: bestHitterLeader?.jersey_number
       ? {
           label: "Best Hitter",
           value: formatPlayerDisplayLabel({
             name: bestHitterLeader.player_name,
             jerseyNumber: bestHitterLeader.jersey_number,
           }),
+          statBasis: bestHitterLeader.stat_line,
           confidence: formatConfidenceLabel(hitterConfidence),
         }
       : null,
     primaryPitcher: primaryPitcherLine(intelligence, pitching),
-    bestRunner: bestRunnerLeader
+    bestRunner: bestRunnerLeader?.jersey_number
       ? {
           label: "Best Runner",
           value: formatPlayerDisplayLabel({
             name: bestRunnerLeader.player_name,
             jerseyNumber: bestRunnerLeader.jersey_number,
           }),
+          statBasis: bestRunnerLeader.stat_line,
         }
       : null,
     pitchingDepth: intelligence.teamIdentity.pitching_depth,

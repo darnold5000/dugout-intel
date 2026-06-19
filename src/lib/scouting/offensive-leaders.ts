@@ -25,6 +25,11 @@ export function filterScoutableProfiles(profiles: PlayerProfile[]): PlayerProfil
   return profiles.filter(isScoutableProfile);
 }
 
+function hasJersey(profile: PlayerProfile): boolean {
+  return !!profile.jerseyNumber?.trim();
+}
+
+
 /** Prefer OPS → OBP → AVG → hits → runs → RBI when advanced stats are missing. */
 export function resolveBestHitterPick(
   profiles: PlayerProfile[]
@@ -77,7 +82,9 @@ export function resolveBestHitterPick(
   ];
 
   for (const attempt of attempts) {
-    const top = attempt.sorted.find(attempt.eligible);
+    const top = attempt.sorted.find(
+      (p) => attempt.eligible(p) && hasJersey(p)
+    );
     if (top) {
       return {
         leader_label: attempt.label,
@@ -99,7 +106,7 @@ export function resolveBestRunnerPick(
   if (!batters.length) return null;
 
   const withSb = sortDesc(
-    batters.filter((p) => (p.batting?.stolen_bases ?? 0) > 0),
+    batters.filter((p) => hasJersey(p) && (p.batting?.stolen_bases ?? 0) > 0),
     (p) => p.batting?.stolen_bases ?? null
   );
   if (withSb[0]) {
@@ -112,7 +119,7 @@ export function resolveBestRunnerPick(
   }
 
   const withRuns = sortDesc(
-    batters.filter((p) => (p.batting?.runs ?? 0) > 0),
+    batters.filter((p) => hasJersey(p) && (p.batting?.runs ?? 0) > 0),
     (p) => p.batting?.runs ?? null
   );
   if (withRuns[0]) {

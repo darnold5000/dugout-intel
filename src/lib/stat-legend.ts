@@ -19,7 +19,7 @@ export const PITCHING_STAT_TERMS: StatLegendTerm[] = [
   { abbr: "IP", meaning: "Innings pitched" },
   { abbr: "P", meaning: "Total pitches" },
   { abbr: "P-S", meaning: "Pitches–strikes" },
-  { abbr: "BF", meaning: "Batters faced" },
+  { abbr: "BF", meaning: "Batters faced (from box score or estimated from IP + H + BB)" },
   { abbr: "B", meaning: "Balls" },
   { abbr: "S%", meaning: "Strike percentage" },
   { abbr: "FPS%", meaning: "First-pitch strike percentage" },

@@ -4,6 +4,7 @@ import {
   parsePlayerIdentity,
   resolveConsolidationKey,
 } from "@/lib/extraction/player-identity";
+import { enrichPitchingStatForDisplay } from "@/lib/scouting/pitching-derived";
 import type {
   ExtractedBattingStat,
   ExtractedPitchingStat,
@@ -328,11 +329,13 @@ export function getConsolidatedPitchingStats(
 ): ExtractedPitchingStat[] {
   return buildPlayerProfiles(data)
     .filter((p) => p.pitching)
-    .map((p) => ({
-      ...p.pitching!,
-      player_name: p.name,
-      jersey_number: p.jerseyNumber,
-    }));
+    .map((p) =>
+      enrichPitchingStatForDisplay({
+        ...p.pitching!,
+        player_name: p.name,
+        jersey_number: p.jerseyNumber,
+      })
+    );
 }
 
 export function battingSummary(profile: PlayerProfile): string {
