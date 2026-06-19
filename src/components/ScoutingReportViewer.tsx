@@ -50,9 +50,39 @@ function LeaderList({
   );
 }
 
+function ReportSection({
+  title,
+  content,
+  list,
+}: {
+  title: string;
+  content?: string;
+  list?: string[];
+}) {
+  if (!content && (!list || list.length === 0)) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>}
+        {list && list.length > 0 && (
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            {list.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
   const [copied, setCopied] = useState(false);
   const data = report.report_json as ScoutingReportJson;
+  const isV2 = Boolean(data.executive_summary || data.pitching_staff_breakdown);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(report.report_text);
@@ -62,15 +92,41 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
 
   const handlePrint = () => window.print();
 
+  if (isV2) {
+    return (
+      <div className="space-y-6">
+        <div className="flex gap-2 no-print">
+          <Button variant="outline" size="sm" onClick={handleCopy}>
+            {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+            {copied ? "Copied!" : "Copy report"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
+        </div>
+
+        <ReportSection title="Executive Summary" content={data.executive_summary ?? data.opponent_summary} />
+        <ReportSection title="Key Players To Know" list={data.key_players ?? data.players_to_watch} />
+        <ReportSection title="Pitching Staff Breakdown" content={data.pitching_staff_breakdown ?? data.pitching_notes} />
+        <ReportSection title="Pitcher Usage / Game Context" content={data.pitcher_usage_context} />
+        <ReportSection title="Offensive Threats" content={data.offensive_threats ?? data.offensive_tendencies} />
+        <ReportSection title="Baserunning Threats" content={data.baserunning_threats} />
+        <ReportSection title="Weaknesses To Attack" content={data.weaknesses_to_attack ?? data.weaknesses_opportunities} />
+        <ReportSection title="Recommended Game Plan" content={data.recommended_game_plan ?? data.suggested_game_plan} />
+        <ReportSection title="Evidence And Confidence" content={data.evidence_and_confidence ?? data.confidence_level} />
+        {data.unknowns_data_gaps.length > 0 && (
+          <ReportSection title="Unknowns / Data Gaps" list={data.unknowns_data_gaps} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 no-print">
         <Button variant="outline" size="sm" onClick={handleCopy}>
-          {copied ? (
-            <Check className="h-4 w-4 mr-1" />
-          ) : (
-            <Copy className="h-4 w-4 mr-1" />
-          )}
+          {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
           {copied ? "Copied!" : "Copy report"}
         </Button>
         <Button variant="outline" size="sm" onClick={handlePrint}>
@@ -78,6 +134,7 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
           Print
         </Button>
       </div>
+
 
       <Card>
         <CardHeader>

@@ -22,6 +22,7 @@ import {
   DialogHeader as ConfirmDialogHeader,
   DialogTitle as ConfirmDialogTitle,
 } from "@/components/ui/dialog";
+import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
 import { getAuthHeaders } from "@/lib/auth-headers";
 import { formatDate } from "@/lib/utils";
 import type { ScoutingReport, ScoutingReportJson } from "@/types";
@@ -153,7 +154,9 @@ export function ReportsTab({
   };
 
   const handleEmailShare = (report: ScoutingReport) => {
-    const summary = (report.report_json as ScoutingReportJson).opponent_summary;
+    const summary =
+      (report.report_json as ScoutingReportJson).executive_summary ??
+      (report.report_json as ScoutingReportJson).opponent_summary;
     const subject = encodeURIComponent(report.title ?? "Scouting Report");
     const body = encodeURIComponent(
       `${report.title ?? "Scouting Report"}\n\n${summary}\n\n---\nFull report:\n${report.report_text.slice(0, 2000)}`
@@ -178,92 +181,54 @@ export function ReportsTab({
 
   return (
     <div className="space-y-6">
-      <Card className="border-primary/20">
-        <CardContent className="py-8 text-center space-y-4">
-          <h2 className="text-xl font-semibold">Scouting Report</h2>
-          {latestReport ? (
-            <p className="text-sm text-muted-foreground">
-              Last Generated: {formatDate(latestReport.created_at)}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No report generated yet
-            </p>
-          )}
-          <div className="flex justify-center gap-6 text-sm text-muted-foreground">
-            <span>
-              Players: <strong className="text-foreground">{playerCount}</strong>
-            </span>
-            <span>
-              Screenshots:{" "}
-              <strong className="text-foreground">{screenshotCount}</strong>
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2 max-w-lg mx-auto">
-            <div className="space-y-2 text-left flex-1">
-              <Label className="text-xs">Report title</Label>
-              <select
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {REPORT_TITLES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2 text-left flex-1">
-              <Label className="text-xs">Custom title (optional)</Label>
-              <Input
-                placeholder="Override title..."
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
-            {latestReport ? (
-              <>
-                <Button size="lg" onClick={() => setFullScreenReport(latestReport)}>
-                  View Report
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handleGenerate}
-                  disabled={generating}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {generating ? "Regenerating..." : "Regenerate"}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => handleDownload(latestReport)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                <Button size="lg" variant="outline" onClick={handlePrint}>
-                  Print
-                </Button>
-              </>
-            ) : (
-              <Button size="lg" onClick={handleGenerate} disabled={generating} className="min-w-[200px]">
-                <Sparkles className="h-4 w-4 mr-2" />
-                {generating ? "Generating..." : "Generate Report"}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-center gap-2 no-print">
+        <Button size="sm" onClick={handleGenerate} disabled={generating}>
+          <Sparkles className="h-4 w-4 mr-1" />
+          {generating ? "Generating..." : "Generate Report"}
+        </Button>
+        <RebuildStatsButton
+          opponentId={opponentId}
+          onComplete={onRefresh}
+          size="sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+        <div className="space-y-1">
+          <Label className="text-xs">Report title</Label>
+          <select
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            {REPORT_TITLES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Custom title (optional)</Label>
+          <Input
+            className="h-9"
+            placeholder="Override title..."
+            value={customTitle}
+            onChange={(e) => setCustomTitle(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {reports.length === 0 && !generating && (
+        <p className="text-sm text-muted-foreground">
+          No reports yet. Add evidence in the Evidence tab, then generate your first scouting report.
+        </p>
+      )}
 
       {displayReport && (
         <Card className="border-primary/30 bg-primary/5">
           <CardHeader>
-            <CardTitle className="text-lg">Latest Report Preview</CardTitle>
+            <CardTitle className="text-lg">Scouting Report</CardTitle>
             <p className="text-sm text-muted-foreground">
               {displayReport.title ?? "Scouting Report"} ·{" "}
               {formatDate(displayReport.created_at)}
@@ -271,6 +236,35 @@ export function ReportsTab({
           </CardHeader>
           <CardContent className="space-y-4">
             <ScoutingReportViewer report={displayReport} />
+            <div className="flex flex-wrap gap-2 no-print">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFullScreenReport(displayReport)}
+              >
+                <Maximize2 className="h-4 w-4 mr-1" />
+                Open Full Report
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrint}>
+                Print / PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload(displayReport)}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleShare(displayReport)}
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -298,8 +292,9 @@ export function ReportsTab({
             <h3 className="font-semibold mb-4">Report History</h3>
             <div className="space-y-2">
               {reports.map((report) => {
-                const summary = (report.report_json as ScoutingReportJson)
-                  .opponent_summary;
+                const summary =
+                  (report.report_json as ScoutingReportJson).executive_summary ??
+                  (report.report_json as ScoutingReportJson).opponent_summary;
                 const isLatest = report.id === latestReportId;
 
                 return (
@@ -400,17 +395,6 @@ export function ReportsTab({
             </div>
           </div>
         </>
-      )}
-
-      {reports.length === 0 && !generating && !displayReport && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              No reports yet. Extract data from screenshots, then generate your
-              first scouting report.
-            </p>
-          </CardContent>
-        </Card>
       )}
 
       <Dialog

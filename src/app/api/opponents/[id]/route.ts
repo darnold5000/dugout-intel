@@ -28,6 +28,10 @@ export async function GET(
 
   const [
     { data: screenshot_uploads },
+    { data: opponent_notes },
+    { data: opponent_documents },
+    { data: opponent_voice_notes },
+    { data: opponent_game_context },
     { data: extracted_players },
     { data: extracted_batting_stats },
     { data: extracted_pitching_stats },
@@ -40,25 +44,29 @@ export async function GET(
       .eq("opponent_id", id)
       .order("created_at", { ascending: false }),
     supabase
-      .from("extracted_players")
+      .from("opponent_notes")
       .select("*")
       .eq("opponent_id", id)
-      .order("created_at"),
+      .order("created_at", { ascending: false }),
     supabase
-      .from("extracted_batting_stats")
+      .from("opponent_documents")
       .select("*")
       .eq("opponent_id", id)
-      .order("created_at"),
+      .order("created_at", { ascending: false }),
     supabase
-      .from("extracted_pitching_stats")
+      .from("opponent_voice_notes")
       .select("*")
       .eq("opponent_id", id)
-      .order("created_at"),
+      .order("created_at", { ascending: false }),
     supabase
-      .from("extracted_games")
+      .from("opponent_game_context")
       .select("*")
       .eq("opponent_id", id)
-      .order("created_at"),
+      .order("created_at", { ascending: false }),
+    supabase.from("extracted_players").select("*").eq("opponent_id", id),
+    supabase.from("extracted_batting_stats").select("*").eq("opponent_id", id),
+    supabase.from("extracted_pitching_stats").select("*").eq("opponent_id", id),
+    supabase.from("extracted_games").select("*").eq("opponent_id", id),
     supabase
       .from("scouting_reports")
       .select("*")
@@ -69,6 +77,10 @@ export async function GET(
   return NextResponse.json({
     ...opponent,
     screenshot_uploads: screenshot_uploads ?? [],
+    opponent_notes: opponent_notes ?? [],
+    opponent_documents: opponent_documents ?? [],
+    opponent_voice_notes: opponent_voice_notes ?? [],
+    opponent_game_context: opponent_game_context ?? [],
     extracted_players: extracted_players ?? [],
     extracted_batting_stats: extracted_batting_stats ?? [],
     extracted_pitching_stats: extracted_pitching_stats ?? [],

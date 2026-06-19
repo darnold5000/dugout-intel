@@ -34,6 +34,10 @@ export default async function OpponentDetailPage({
 
   const [
     { data: screenshot_uploads },
+    { data: opponent_notes },
+    { data: opponent_documents },
+    { data: opponent_voice_notes },
+    { data: opponent_game_context },
     { data: extracted_players },
     { data: extracted_batting_stats },
     { data: extracted_pitching_stats },
@@ -42,6 +46,26 @@ export default async function OpponentDetailPage({
   ] = await Promise.all([
     supabase
       .from("screenshot_uploads")
+      .select("*")
+      .eq("opponent_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("opponent_notes")
+      .select("*")
+      .eq("opponent_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("opponent_documents")
+      .select("*")
+      .eq("opponent_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("opponent_voice_notes")
+      .select("*")
+      .eq("opponent_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("opponent_game_context")
       .select("*")
       .eq("opponent_id", id)
       .order("created_at", { ascending: false }),
@@ -59,6 +83,10 @@ export default async function OpponentDetailPage({
   const detail: OpponentDetail = {
     ...opponent,
     screenshot_uploads: screenshot_uploads ?? [],
+    opponent_notes: opponent_notes ?? [],
+    opponent_documents: opponent_documents ?? [],
+    opponent_voice_notes: opponent_voice_notes ?? [],
+    opponent_game_context: opponent_game_context ?? [],
     extracted_players: extracted_players ?? [],
     extracted_batting_stats: extracted_batting_stats ?? [],
     extracted_pitching_stats: extracted_pitching_stats ?? [],

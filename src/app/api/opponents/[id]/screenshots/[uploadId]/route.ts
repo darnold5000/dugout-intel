@@ -2,6 +2,50 @@ import { NextResponse } from "next/server";
 import { getSupabaseFromRequest } from "@/lib/supabase/request";
 import { rebuildOpponentStats } from "@/lib/extraction/rebuild-opponent-stats";
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string; uploadId: string }> }
+) {
+  const { id: opponentId, uploadId } = await params;
+  const supabase = await getSupabaseFromRequest(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const updates: Record<string, unknown> = {};
+  const allowed = [
+    "screenshot_type",
+    "included_in_report",
+    "game_date",
+    "opponent_played",
+    "tournament_name",
+    "game_type",
+  ];
+  for (const key of allowed) {
+    if (body[key] !== undefined) updates[key] = body[key];
+  }
+
+  const { data, error } = await supabase
+    .from("screenshot_uploads")
+    .update(updates)
+    .eq("id", uploadId)
+    .eq("opponent_id", opponentId)
+    .eq("user_id", user.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: "Screenshot not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(data);
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string; uploadId: string }> }
@@ -35,7 +79,6 @@ export async function DELETE(
     .remove([upload.file_path]);
 
   if (storageError) {
-    console.log("[delete-screenshot] storage error:", storageError.message);
     return NextResponse.json(
       { error: `Storage delete failed: ${storageError.message}` },
       { status: 500 }
@@ -48,19 +91,13 @@ export async function DELETE(
     .eq("id", uploadId);
 
   if (dbError) {
-    console.log("[delete-screenshot] db error:", dbError.message);
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  console.log("[delete-screenshot] deleted:", uploadId, "for user", user.id);
-
   try {
     await rebuildOpponentStats(supabase, opponentId);
-  } catch (err) {
-    console.log(
-      "[delete-screenshot] rebuild stats warning:",
-      err instanceof Error ? err.message : err
-    );
+  } catch {
+    // non-fatal
   }
 
   return NextResponse.json({ success: true });

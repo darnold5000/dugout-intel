@@ -6,5 +6,5 @@ export default async function UploadRedirect({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/opponents/${id}?tab=screenshots`);
+  redirect(`/opponents/${id}?tab=evidence`);
 }

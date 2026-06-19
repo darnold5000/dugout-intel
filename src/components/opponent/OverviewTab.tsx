@@ -69,7 +69,7 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-xs text-muted-foreground">Players</p>
@@ -86,6 +86,17 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
           <CardContent className="pt-4 pb-4">
             <p className="text-xs text-muted-foreground">Screenshots</p>
             <p className="text-2xl font-semibold">{data.screenshot_uploads.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground">Evidence Items</p>
+            <p className="text-2xl font-semibold">
+              {(data.screenshot_uploads?.length ?? 0) +
+                (data.opponent_notes?.length ?? 0) +
+                (data.opponent_voice_notes?.length ?? 0) +
+                (data.opponent_documents?.length ?? 0)}
+            </p>
             {lastUpdated && (
               <p className="text-[11px] text-muted-foreground mt-1">
                 Updated {formatDate(lastUpdated)}
@@ -159,10 +170,10 @@ export function OverviewTab({ data, onRefresh, onSwitchTab }: OverviewTabProps) 
         <Card>
           <CardContent className="py-12 text-center space-y-3">
             <p className="text-muted-foreground">
-              Upload GameChanger screenshots to build your opponent scouting profile.
+              Add evidence in the Evidence tab — screenshots, notes, voice memos, or documents.
             </p>
-            <Button variant="outline" onClick={() => onSwitchTab("screenshots")}>
-              Go to Screenshots
+            <Button variant="outline" onClick={() => onSwitchTab("evidence")}>
+              Go to Evidence
             </Button>
           </CardContent>
         </Card>

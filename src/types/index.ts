@@ -6,7 +6,37 @@ export type ScreenshotType =
   | "box_score"
   | "unknown"
   | "schedule"
-  | "game_summary";
+  | "game_summary"
+  | "bracket_tournament";
+
+export type NoteType =
+  | "general"
+  | "pitching"
+  | "hitting"
+  | "baserunning"
+  | "defense"
+  | "tournament_context";
+
+export type Importance = "low" | "medium" | "high";
+
+export type GameType =
+  | "unknown"
+  | "pool_play"
+  | "bracket_play"
+  | "championship"
+  | "friendly"
+  | "scrimmage";
+
+export type Leverage = "low" | "medium" | "high";
+
+export type ReasonPitcherEntered =
+  | "unknown"
+  | "starter_struggling"
+  | "planned_rotation"
+  | "pitch_count_management"
+  | "save_best_pitcher"
+  | "close_game"
+  | "blowout";
 
 export interface RawExtractedTable {
   headers: string[];
@@ -50,7 +80,71 @@ export interface ScreenshotUpload {
   extraction_error: string | null;
   raw_extracted_table: RawExtractedTable | null;
   extraction_warnings: string[] | null;
+  included_in_report?: boolean;
+  game_date?: string | null;
+  opponent_played?: string | null;
+  tournament_name?: string | null;
+  game_type?: GameType | string | null;
   created_at: string;
+}
+
+export interface OpponentNote {
+  id: string;
+  opponent_id: string;
+  user_id: string;
+  note_text: string;
+  note_type: NoteType | string;
+  importance: Importance | string;
+  game_date: string | null;
+  opponent_played: string | null;
+  game_type: GameType | string;
+  included_in_report: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpponentDocument {
+  id: string;
+  opponent_id: string;
+  user_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string | null;
+  extracted_text: string | null;
+  included_in_report: boolean;
+  created_at: string;
+}
+
+export interface OpponentVoiceNote {
+  id: string;
+  opponent_id: string;
+  user_id: string;
+  audio_file_path: string | null;
+  transcript_text: string | null;
+  note_type: NoteType | string;
+  game_type: GameType | string;
+  game_date: string | null;
+  opponent_played: string | null;
+  included_in_report: boolean;
+  created_at: string;
+}
+
+export interface OpponentGameContext {
+  id: string;
+  opponent_id: string;
+  user_id: string;
+  game_date: string | null;
+  opponent_played: string | null;
+  tournament_name: string | null;
+  game_type: GameType | string;
+  inning_observed: string | null;
+  score_when_pitcher_entered: string | null;
+  reason_pitcher_entered: ReasonPitcherEntered | string;
+  leverage: Leverage | string;
+  notes: string | null;
+  included_in_report: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ExtractedPlayer {
@@ -167,6 +261,17 @@ export interface ExtractionResult {
 }
 
 export interface ScoutingReportJson {
+  /** Report structure 2.1 */
+  executive_summary?: string;
+  key_players?: string[];
+  pitching_staff_breakdown?: string;
+  pitcher_usage_context?: string;
+  offensive_threats?: string;
+  baserunning_threats?: string;
+  weaknesses_to_attack?: string;
+  recommended_game_plan?: string;
+  evidence_and_confidence?: string;
+  /** Legacy fields (v1 reports) */
   opponent_summary: string;
   offensive_tendencies: string;
   pitching_notes: string;
@@ -330,6 +435,10 @@ export interface AIExtractionResult {
 
 export interface OpponentDetail extends Opponent {
   screenshot_uploads: ScreenshotUpload[];
+  opponent_notes?: OpponentNote[];
+  opponent_documents?: OpponentDocument[];
+  opponent_voice_notes?: OpponentVoiceNote[];
+  opponent_game_context?: OpponentGameContext[];
   extracted_players: ExtractedPlayer[];
   extracted_batting_stats: ExtractedBattingStat[];
   extracted_pitching_stats: ExtractedPitchingStat[];

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSupabaseFromRequest } from "@/lib/supabase/request";
 import { generateScoutingReport } from "@/lib/ai";
+import {
+  buildEvidencePacket,
+  hasEvidenceForReport,
+} from "@/lib/scouting/evidence-packet";
 import type { OpponentDetail } from "@/types";
 
 export async function POST(
@@ -36,10 +40,14 @@ export async function POST(
 
   const [
     { data: screenshot_uploads },
-    { data: players },
-    { data: battingStats },
-    { data: pitchingStats },
-    { data: games },
+    { data: opponent_notes },
+    { data: opponent_documents },
+    { data: opponent_voice_notes },
+    { data: opponent_game_context },
+    { data: extracted_players },
+    { data: extracted_batting_stats },
+    { data: extracted_pitching_stats },
+    { data: extracted_games },
     { data: scouting_reports },
   ] = await Promise.all([
     supabase
@@ -47,6 +55,10 @@ export async function POST(
       .select("*")
       .eq("opponent_id", opponentId)
       .order("created_at", { ascending: false }),
+    supabase.from("opponent_notes").select("*").eq("opponent_id", opponentId),
+    supabase.from("opponent_documents").select("*").eq("opponent_id", opponentId),
+    supabase.from("opponent_voice_notes").select("*").eq("opponent_id", opponentId),
+    supabase.from("opponent_game_context").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_players").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_batting_stats").select("*").eq("opponent_id", opponentId),
     supabase.from("extracted_pitching_stats").select("*").eq("opponent_id", opponentId),
@@ -58,34 +70,38 @@ export async function POST(
       .order("created_at", { ascending: false }),
   ]);
 
-  const hasData =
-    (players?.length ?? 0) > 0 ||
-    (battingStats?.length ?? 0) > 0 ||
-    (pitchingStats?.length ?? 0) > 0 ||
-    (games?.length ?? 0) > 0;
-
-  if (!hasData) {
-    return NextResponse.json(
-      { error: "No extracted data available. Run extraction first." },
-      { status: 400 }
-    );
-  }
-
   const opponentDetail: OpponentDetail = {
     ...opponent,
     screenshot_uploads: screenshot_uploads ?? [],
-    extracted_players: players ?? [],
-    extracted_batting_stats: battingStats ?? [],
-    extracted_pitching_stats: pitchingStats ?? [],
-    extracted_games: games ?? [],
+    opponent_notes: opponent_notes ?? [],
+    opponent_documents: opponent_documents ?? [],
+    opponent_voice_notes: opponent_voice_notes ?? [],
+    opponent_game_context: opponent_game_context ?? [],
+    extracted_players: extracted_players ?? [],
+    extracted_batting_stats: extracted_batting_stats ?? [],
+    extracted_pitching_stats: extracted_pitching_stats ?? [],
+    extracted_games: extracted_games ?? [],
     scouting_reports: scouting_reports ?? [],
   };
+
+  const evidencePacket = buildEvidencePacket(opponentDetail);
+
+  if (!hasEvidenceForReport(evidencePacket)) {
+    return NextResponse.json(
+      {
+        error:
+          "No evidence available. Add screenshots, notes, voice notes, or documents first.",
+      },
+      { status: 400 }
+    );
+  }
 
   try {
     const { reportJson, reportText } = await generateScoutingReport({
       opponentName: opponent.name,
       ageLevel: opponent.age_level,
       opponentDetail,
+      evidencePacket,
     });
 
     const { data: report, error: saveError } = await supabase

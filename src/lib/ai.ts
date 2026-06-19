@@ -1,11 +1,12 @@
 import OpenAI from "openai";
 import { enrichExtractionResult } from "@/lib/extraction/post-process";
+import type { EvidencePacket } from "@/lib/scouting/evidence-packet";
 import {
   buildTeamIntelligence,
   formatIntelligenceReportText,
   intelligenceToReportJson,
 } from "@/lib/scouting/team-intelligence";
-import type { AIExtractionResult, OpponentDetail, ScoutingReportJson } from "@/types";
+import type { AIExtractionResult, OpponentDetail } from "@/types";
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) {
@@ -40,6 +41,7 @@ SCREENSHOT TYPE CLASSIFIER (screenshot_type):
 - pitching_stats
 - schedule_results
 - box_score
+- bracket_tournament
 - unknown
 
 GAMECHANGER BATTING COLUMNS TO RECOGNIZE:
@@ -107,7 +109,20 @@ Return ONLY valid JSON matching this schema:
 
 const REPORT_NARRATIVE_PROMPT = `You are a youth baseball scouting assistant writing reports for coaches of 9U-12U travel ball teams.
 
-You will receive PRE-COMPUTED scouting intelligence with verified stats and player rankings. Your job is to write compelling narrative prose that references specific players and stats from the data. Do NOT invent stats. Do NOT contradict the structured intelligence.
+You will receive PRE-COMPUTED scouting intelligence with verified stats and player rankings, plus a full evidence packet (screenshots, coach notes, voice transcripts, documents, game context). Your job is to write compelling narrative prose that references specific players and stats from the data.
+
+Write in plain English, coach-friendly tone. Be practical and actionable.
+
+CRITICAL RULES:
+- Use ALL evidence provided: structured intelligence, screenshots/raw tables, coach notes, voice transcripts, documents, and game context.
+- Clearly distinguish CONFIRMED DATA (from stats/screenshots) from NOTE-BASED INFERENCE (from coach notes/voice).
+- Label inferences explicitly: "Note-based inference: ..."
+- Reference players by name AND jersey number when available.
+- For pitching: analyze pitch counts, strikes, balls, strike %, innings pitched, and pitcher roles.
+- Use the pre-computed pitching staff analysis when provided.
+- Pool play usage is weaker evidence than bracket/championship usage — say so.
+- Baseball innings: 2.1 IP = 2 and 1/3 innings, NOT 2.1 decimal innings.
+- Do NOT invent stats. Do NOT contradict the structured intelligence.
 
 Return ONLY valid JSON:
 {
@@ -173,7 +188,8 @@ export async function generateScoutingReport(data: {
   opponentName: string;
   ageLevel: string;
   opponentDetail: OpponentDetail;
-}): Promise<{ reportJson: ScoutingReportJson; reportText: string }> {
+  evidencePacket: EvidencePacket;
+}): Promise<{ reportJson: import("@/types").ScoutingReportJson; reportText: string }> {
   const intelligence = buildTeamIntelligence(data.opponentDetail);
 
   let aiNarrative: Partial<{
@@ -207,11 +223,16 @@ ${JSON.stringify(
   },
   null,
   2
-)}`,
+)}
+
+Full evidence packet (screenshots, notes, voice transcripts, documents, game context, consolidated stats, and pitching analysis):
+${JSON.stringify(data.evidencePacket, null, 2)}
+
+Write practical advice for a youth baseball coach preparing to play this team.`,
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 2048,
+      max_tokens: 4096,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -226,6 +247,66 @@ ${JSON.stringify(
   const reportText = formatIntelligenceReportText(data.opponentName, reportJson);
 
   return { reportJson, reportText };
+}
+
+export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
+  const file = new File([Uint8Array.from(audioBuffer)], "voice-note.webm", {
+    type: mimeType,
+  });
+  const transcription = await getOpenAI().audio.transcriptions.create({
+    file,
+    model: "whisper-1",
+    language: "en",
+  });
+  return transcription.text.trim();
+}
+
+export async function extractDocumentText(
+  buffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<string> {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+
+  if (ext === "txt" || ext === "csv" || mimeType.startsWith("text/")) {
+    return buffer.toString("utf-8").trim();
+  }
+
+  if (mimeType.startsWith("image/")) {
+    const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all readable text and tabular data from this document image. Return plain text only.",
+            },
+            { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+    });
+    return response.choices[0]?.message?.content?.trim() ?? "";
+  }
+
+  const response = await getOpenAI().chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: `A document named "${fileName}" was uploaded. Based on the filename and type (${mimeType}), provide a brief note that the document was uploaded. If this appears to be a tournament bracket, schedule, or roster document, note what type it likely is.`,
+      },
+    ],
+    max_tokens: 500,
+  });
+  return (
+    response.choices[0]?.message?.content?.trim() ??
+    `Uploaded document: ${fileName}`
+  );
 }
 
 export async function fileToDataUrl(
