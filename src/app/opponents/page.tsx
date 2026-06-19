@@ -65,7 +65,7 @@ export default async function OpponentsPage() {
         {!opponents || opponents.length === 0 ? (
           <EmptyState
             title="No opponents yet"
-            description="Add an opponent team to start uploading GameChanger screenshots."
+            description="Add an opponent team to start uploading screenshots and scout notes."
             actionLabel="Create opponent"
             actionHref="/opponents/new"
           />

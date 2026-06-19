@@ -58,7 +58,7 @@ export default async function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground mt-1">
-              Scout opponents from GameChanger screenshots
+              Scout opponents from screenshots and notes
             </p>
           </div>
           <Button asChild>

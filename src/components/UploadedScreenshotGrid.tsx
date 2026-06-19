@@ -19,7 +19,7 @@ export function UploadedScreenshotGrid({ uploads }: UploadedScreenshotGridProps)
           <div className="relative aspect-[9/16] max-h-64 bg-muted">
             <Image
               src={upload.file_url}
-              alt="GameChanger screenshot"
+              alt="Uploaded screenshot"
               fill
               className="object-contain"
               sizes="(max-width: 768px) 100vw, 33vw"

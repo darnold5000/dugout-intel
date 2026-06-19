@@ -1,4 +1,4 @@
-/** Convert GameChanger IP notation (e.g. 2.1 = 2⅓) to decimal innings. */
+/** Convert fractional IP notation (e.g. 2.1 = 2⅓) to decimal innings. */
 export function parseBaseballInnings(value: number): number {
   const whole = Math.floor(value);
   const tenths = Math.round((value - whole) * 10);

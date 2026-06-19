@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlayerThreatCard } from "@/components/opponent/PlayerThreatCard";
 import { buildPlayerProfiles } from "@/lib/scouting/player-profiles";
+import {
+  resolveBestHitterPick,
+  resolveBestRunnerPick,
+} from "@/lib/scouting/offensive-leaders";
 import { buildTeamIntelligence } from "@/lib/scouting/team-intelligence";
 import { buildCoachTakeaways } from "@/lib/scouting/coach-takeaways";
 import { analyzePitchingStaffFromDetail } from "@/lib/scouting/pitching-analysis";
@@ -96,11 +100,31 @@ export function OverviewTab({ opponentName, data, onSwitchTab }: OverviewTabProp
   const hasData =
     profiles.length > 0 || notesCount > 0 || data.screenshot_uploads.length > 0;
 
-  const topHitter =
-    intelligence.offensiveLeaders.highest_ops ??
-    intelligence.offensiveLeaders.highest_avg;
+  const topHitterPick = useMemo(
+    () => resolveBestHitterPick(profiles),
+    [profiles]
+  );
+  const topRunnerPick = useMemo(
+    () => resolveBestRunnerPick(profiles),
+    [profiles]
+  );
+
+  const topHitter = topHitterPick
+    ? {
+        jersey_number: topHitterPick.jersey_number,
+        player_name: topHitterPick.player_name,
+        stat_line: topHitterPick.stat_line,
+      }
+    : intelligence.offensiveLeaders.highest_ops ??
+      intelligence.offensiveLeaders.highest_avg;
   const topPitcher = intelligence.pitchingLeaders.ace_pitcher;
-  const topRunner = intelligence.offensiveLeaders.most_stolen_bases;
+  const topRunner = topRunnerPick
+    ? {
+        jersey_number: topRunnerPick.jersey_number,
+        player_name: topRunnerPick.player_name,
+        stat_line: topRunnerPick.stat_line,
+      }
+    : intelligence.offensiveLeaders.most_stolen_bases;
   const strikeThrower = intelligence.pitchingLeaders.strike_thrower;
   const pitchCountLeader = intelligence.pitchCountLeaders?.[0];
   const highLeverageArm = pitchingAnalyses.find((p) =>
@@ -175,11 +199,7 @@ export function OverviewTab({ opponentName, data, onSwitchTab }: OverviewTabProp
                 stat={topPitcher.stat_line}
               />
             )}
-            {topRunner &&
-              (intelligence.offensiveLeaders.most_stolen_bases?.stat_line.includes(
-                "SB"
-              ) ??
-                false) && (
+            {topRunner && (
                 <ThreatCard
                   title="Best Runner"
                   jersey={

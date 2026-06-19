@@ -69,7 +69,7 @@ export function ScreenshotUploader({
       >
         <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
         <p className="text-sm font-medium">
-          Drag & drop GameChanger screenshots here
+          Drag & drop stat screenshots here
         </p>
         <p className="text-xs text-muted-foreground mt-1">
           PNG, JPG up to {maxFiles} files

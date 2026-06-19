@@ -1,4 +1,14 @@
-import { parsePlayerIdentity, resolveConsolidationKey, buildCanonicalKeyMap } from "@/lib/extraction/player-identity";
+import {
+  buildCanonicalKeyMap,
+  parsePlayerIdentity,
+  resolveConsolidationKey,
+} from "@/lib/extraction/player-identity";
+import {
+  filterScoutableProfiles,
+  offensiveLeaderPickToLeaderEntry,
+  resolveBestHitterPick,
+  resolveBestRunnerPick,
+} from "@/lib/scouting/offensive-leaders";
 import {
   buildPlayerProfiles,
   collectDataGaps,
@@ -172,7 +182,8 @@ function offensiveThreatScore(profile: PlayerProfile): number {
 function buildOffensiveLeaders(
   profiles: PlayerProfile[]
 ): Record<string, LeaderEntry | null> {
-  const withBatting = profiles.filter((p) => p.batting);
+  const scoutable = filterScoutableProfiles(profiles);
+  const withBatting = scoutable.filter((p) => p.batting);
 
   const pick = (
     label: string,
@@ -196,10 +207,15 @@ function buildOffensiveLeaders(
     (a, b) => (a.batting?.strikeouts ?? 999) - (b.batting?.strikeouts ?? 999)
   );
 
+  const bestHitter = resolveBestHitterPick(scoutable);
+  const bestRunner = resolveBestRunnerPick(scoutable);
+
   return {
     highest_avg: pick("Highest AVG", byAvg, (p) => `AVG ${formatAvg(p.batting?.avg)}`),
     highest_obp: pick("Highest OBP", byObp, (p) => `OBP ${formatAvg(p.batting?.obp)}`),
-    highest_ops: pick("Highest OPS", byOps, (p) => `OPS ${formatAvg(p.batting?.ops)}`),
+    highest_ops: bestHitter
+      ? offensiveLeaderPickToLeaderEntry(bestHitter)
+      : pick("Highest OPS", byOps, (p) => `OPS ${formatAvg(p.batting?.ops)}`),
     most_hits: pick("Most Hits", byHits, (p) => `${p.batting?.hits ?? 0} H`),
     most_rbi: pick("Most RBI", byRbi, (p) => `${p.batting?.rbi ?? 0} RBI`),
     most_runs: pick("Most Runs", byRuns, (p) => `${p.batting?.runs ?? 0} R`),
@@ -209,11 +225,9 @@ function buildOffensiveLeaders(
       byFewestK,
       (p) => `${p.batting?.strikeouts ?? 0} SO`
     ),
-    most_stolen_bases: pick(
-      "Most Stolen Bases",
-      bySb,
-      (p) => `${p.batting?.stolen_bases ?? 0} SB`
-    ),
+    most_stolen_bases: bestRunner
+      ? offensiveLeaderPickToLeaderEntry(bestRunner)
+      : null,
   };
 }
 

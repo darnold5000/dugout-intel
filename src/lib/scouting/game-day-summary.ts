@@ -1,5 +1,9 @@
 import { buildCoachTakeaways } from "@/lib/scouting/coach-takeaways";
 import {
+  resolveBestHitterPick,
+  resolveBestRunnerPick,
+} from "@/lib/scouting/offensive-leaders";
+import {
   analyzePitchingStaffFromDetail,
   type PitcherAnalysis,
 } from "@/lib/scouting/pitching-analysis";
@@ -66,10 +70,8 @@ export function buildGameDaySummary(
   const pitching = analyzePitchingStaffFromDetail(data);
   const takeaways = buildCoachTakeaways(data, intelligence, pitching);
 
-  const bestHitterLeader =
-    intelligence.offensiveLeaders.highest_ops ??
-    intelligence.offensiveLeaders.highest_avg;
-  const bestRunnerLeader = intelligence.offensiveLeaders.most_stolen_bases;
+  const bestHitterLeader = resolveBestHitterPick(intelligence.profiles);
+  const bestRunnerLeader = resolveBestRunnerPick(intelligence.profiles);
 
   const hitterProfile = bestHitterLeader
     ? intelligence.profiles.find(

@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GameChanger Screenshot Scout",
-  description: "AI-powered opponent scouting from GameChanger screenshots",
+  title: "Dugout Intel",
+  description: "AI-powered opponent scouting from screenshots and notes",
 };
 
 export default function RootLayout({

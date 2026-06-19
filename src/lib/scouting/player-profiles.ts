@@ -1,5 +1,6 @@
 import {
   buildCanonicalKeyMap,
+  isScoutablePlayerName,
   parsePlayerIdentity,
   resolveConsolidationKey,
 } from "@/lib/extraction/player-identity";
@@ -170,9 +171,31 @@ export function buildPlayerProfiles(data: OpponentDetail): PlayerProfile[] {
     profile.needsReview = reasons.length > 0;
   }
 
-  return Array.from(profileMap.values()).sort((a, b) =>
-    (a.name ?? "").localeCompare(b.name ?? "")
-  );
+  backfillNamesFromJersey(profileMap);
+
+  return Array.from(profileMap.values())
+    .filter((p) => isScoutablePlayerName(p.name))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+}
+
+function backfillNamesFromJersey(profileMap: Map<string, PlayerProfile>): void {
+  const nameByJersey = new Map<string, string>();
+  for (const profile of profileMap.values()) {
+    if (profile.jerseyNumber && isScoutablePlayerName(profile.name)) {
+      const existing = nameByJersey.get(profile.jerseyNumber);
+      if (!existing || profile.name!.length > existing.length) {
+        nameByJersey.set(profile.jerseyNumber, profile.name!);
+      }
+    }
+  }
+  for (const profile of profileMap.values()) {
+    if (!isScoutablePlayerName(profile.name) && profile.jerseyNumber) {
+      const resolved = nameByJersey.get(profile.jerseyNumber);
+      if (resolved) {
+        profile.name = resolved;
+      }
+    }
+  }
 }
 
 function sortByDesc<T>(items: T[], getter: (item: T) => number | null): T[] {

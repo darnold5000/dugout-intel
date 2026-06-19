@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { StatsLegend } from "@/components/StatsLegend";
 import { formatPercent, formatStat } from "@/lib/utils";
+import { PITCHING_STAT_TERMS, pickLegendTerms } from "@/lib/stat-legend";
 import type { ExtractedPitchingStat } from "@/types";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
@@ -30,6 +32,25 @@ function pitchCount(stat: ExtractedPitchingStat): number | null {
   return stat.total_pitches ?? stat.pitches;
 }
 
+function pitchStrikesLine(stat: ExtractedPitchingStat): string | null {
+  const pitches = pitchCount(stat);
+  if (pitches == null || stat.strikes == null) return null;
+  return `${pitches}-${stat.strikes}`;
+}
+
+function derivedStrikePct(stat: ExtractedPitchingStat): number | null {
+  if (stat.strike_percentage != null) return stat.strike_percentage;
+  const pitches = pitchCount(stat);
+  if (pitches == null || stat.strikes == null || pitches <= 0) return null;
+  return (stat.strikes / pitches) * 100;
+}
+
+function derivedBalls(stat: ExtractedPitchingStat): number | null {
+  const pitches = pitchCount(stat);
+  if (pitches == null || stat.strikes == null) return null;
+  return pitches - stat.strikes;
+}
+
 function hasPitchingData(stat: ExtractedPitchingStat): boolean {
   return [
     stat.innings_pitched,
@@ -37,11 +58,13 @@ function hasPitchingData(stat: ExtractedPitchingStat): boolean {
     stat.strikeouts,
     stat.walks,
     stat.hits_allowed,
+    stat.runs_allowed,
     stat.strike_percentage,
     stat.total_pitches,
     stat.pitches,
-    stat.first_pitch_strike_pct,
+    stat.strikes,
     stat.batters_faced,
+    stat.first_pitch_strike_pct,
     stat.k_bb_ratio,
   ].some((v) => v != null);
 }
@@ -71,9 +94,11 @@ export function PitchingStatsTable({
 
   const showJersey = filtered.some((s) => s.jersey_number);
   const showIp = filtered.some((s) => s.innings_pitched != null);
-  const showP = filtered.some((s) => pitchCount(s) != null);
+  const showPitchStrikes = filtered.some((s) => pitchStrikesLine(s) != null);
+  const showP =
+    filtered.some((s) => pitchCount(s) != null) && !showPitchStrikes;
   const showBf = filtered.some((s) => s.batters_faced != null);
-  const showStrikes = filtered.some((s) => s.strikes != null);
+  const showBalls = filtered.some((s) => derivedBalls(s) != null);
   const showFps = filtered.some((s) => s.first_pitch_strike_pct != null);
   const showEra = filtered.some((s) => s.era != null);
   const showWhip = filtered.some((s) => computeWhip(s) != null);
@@ -81,7 +106,7 @@ export function PitchingStatsTable({
   const showBb = filtered.some((s) => s.walks != null);
   const showKbb = filtered.some((s) => s.k_bb_ratio != null);
   const showBbInn = filtered.some((s) => s.walks_per_inning != null);
-  const showStrikePct = filtered.some((s) => s.strike_percentage != null);
+  const showStrikePct = filtered.some((s) => derivedStrikePct(s) != null);
   const showBaa = filtered.some((s) => s.baa != null);
   const showSm = filtered.some((s) => s.swing_miss_pct != null);
   const showPip = filtered.some((s) => s.pitches_per_inning != null);
@@ -90,6 +115,66 @@ export function PitchingStatsTable({
   const showLoo = filtered.some((s) => s.leadoff_outs != null);
   const showBabip = filtered.some((s) => s.babip != null);
   const showFip = filtered.some((s) => s.fip != null);
+
+  const hasAdvancedColumns =
+    showFps ||
+    showBbInn ||
+    showPip ||
+    showPbf ||
+    showBaa ||
+    showSm ||
+    show123 ||
+    showLoo ||
+    showBabip ||
+    showFip;
+
+  const legendTerms = useMemo(() => {
+    const abbrs: string[] = [];
+    if (showIp) abbrs.push("IP");
+    if (showP) abbrs.push("P");
+    if (showPitchStrikes) abbrs.push("P-S");
+    if (showBf) abbrs.push("BF");
+    if (showBalls) abbrs.push("B");
+    if (showStrikePct) abbrs.push("S%");
+    if (showFps) abbrs.push("FPS%");
+    if (showEra) abbrs.push("ERA");
+    if (showWhip) abbrs.push("WHIP");
+    if (showK) abbrs.push("K");
+    if (showBb) abbrs.push("BB");
+    if (showKbb) abbrs.push("K/BB");
+    if (showBbInn) abbrs.push("BB/INN");
+    if (showPip) abbrs.push("P/IP");
+    if (showPbf) abbrs.push("P/BF");
+    if (showBaa) abbrs.push("BAA");
+    if (showSm) abbrs.push("SM%");
+    if (show123) abbrs.push("123INN");
+    if (showLoo) abbrs.push("LOO");
+    if (showBabip) abbrs.push("BABIP");
+    if (showFip) abbrs.push("FIP");
+    return pickLegendTerms(PITCHING_STAT_TERMS, abbrs);
+  }, [
+    showIp,
+    showP,
+    showPitchStrikes,
+    showBf,
+    showBalls,
+    showStrikePct,
+    showFps,
+    showEra,
+    showWhip,
+    showK,
+    showBb,
+    showKbb,
+    showBbInn,
+    showPip,
+    showPbf,
+    showBaa,
+    showSm,
+    show123,
+    showLoo,
+    showBabip,
+    showFip,
+  ]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -159,15 +244,17 @@ export function PitchingStatsTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end no-print">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowAdvanced((v) => !v)}
-        >
-          {showAdvanced ? "Hide advanced" : "Show advanced"}
-        </Button>
-      </div>
+      {hasAdvancedColumns && (
+        <div className="flex justify-end no-print">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            {showAdvanced ? "Hide advanced" : "Show advanced"}
+          </Button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -176,23 +263,28 @@ export function PitchingStatsTable({
               {showJersey && <th className="pb-2 pr-3 font-medium">#</th>}
               {showIp && <SortHeader field="innings_pitched" label="IP" />}
               {showP && <SortHeader field="total_pitches" label="P" />}
-              {showFps && (
-                <SortHeader field="first_pitch_strike_pct" label="FPS%" />
+              {showPitchStrikes && (
+                <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                  P-S
+                </th>
+              )}
+              {showBf && (
+                <th className="pb-2 pr-3 font-medium whitespace-nowrap">BF</th>
+              )}
+              {showBalls && (
+                <th className="pb-2 pr-3 font-medium whitespace-nowrap">B</th>
               )}
               {showStrikePct && (
                 <SortHeader field="strike_percentage" label="S%" />
+              )}
+              {showFps && showAdvanced && (
+                <SortHeader field="first_pitch_strike_pct" label="FPS%" />
               )}
               {showEra && <SortHeader field="era" label="ERA" />}
               {showWhip && <th className="pb-2 pr-3 font-medium">WHIP</th>}
               {showK && <SortHeader field="strikeouts" label="K" />}
               {showBb && <SortHeader field="walks" label="BB" />}
               {showKbb && <th className="pb-2 pr-3 font-medium">K/BB</th>}
-              {showAdvanced && showBf && (
-                <th className="pb-2 pr-3 font-medium">BF</th>
-              )}
-              {showAdvanced && showStrikes && (
-                <th className="pb-2 pr-3 font-medium">S</th>
-              )}
               {showAdvanced && showBbInn && (
                 <th className="pb-2 pr-3 font-medium">BB/INN</th>
               )}
@@ -252,14 +344,23 @@ export function PitchingStatsTable({
                 {showP && (
                   <td className="py-2 pr-3">{pitchCount(stat) ?? "—"}</td>
                 )}
-                {showFps && (
-                  <td className="py-2 pr-3">
-                    {formatPercent(stat.first_pitch_strike_pct)}
-                  </td>
+                {showPitchStrikes && (
+                  <td className="py-2 pr-3">{pitchStrikesLine(stat) ?? "—"}</td>
+                )}
+                {showBf && (
+                  <td className="py-2 pr-3">{stat.batters_faced ?? "—"}</td>
+                )}
+                {showBalls && (
+                  <td className="py-2 pr-3">{derivedBalls(stat) ?? "—"}</td>
                 )}
                 {showStrikePct && (
                   <td className="py-2 pr-3">
-                    {formatPercent(stat.strike_percentage)}
+                    {formatPercent(derivedStrikePct(stat))}
+                  </td>
+                )}
+                {showFps && showAdvanced && (
+                  <td className="py-2 pr-3">
+                    {formatPercent(stat.first_pitch_strike_pct)}
                   </td>
                 )}
                 {showEra && (
@@ -278,12 +379,6 @@ export function PitchingStatsTable({
                   <td className="py-2 pr-3">
                     {formatStat(stat.k_bb_ratio, 2)}
                   </td>
-                )}
-                {showAdvanced && showBf && (
-                  <td className="py-2 pr-3">{stat.batters_faced ?? "—"}</td>
-                )}
-                {showAdvanced && showStrikes && (
-                  <td className="py-2 pr-3">{stat.strikes ?? "—"}</td>
                 )}
                 {showAdvanced && showBbInn && (
                   <td className="py-2 pr-3">
@@ -330,6 +425,7 @@ export function PitchingStatsTable({
           </tbody>
         </table>
       </div>
+      <StatsLegend terms={legendTerms} className="mt-3" />
     </div>
   );
 }

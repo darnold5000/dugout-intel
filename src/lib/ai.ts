@@ -15,7 +15,7 @@ function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-const EXTRACTION_SYSTEM_PROMPT = `You are a youth baseball data extraction assistant specializing in GameChanger app screenshots.
+const EXTRACTION_SYSTEM_PROMPT = `You are a youth baseball data extraction assistant specializing in stat screenshots from mobile scorekeeping apps.
 
 PRIMARY TASK:
 Treat every screenshot as a TABLE whenever rows and columns are visible. Extract ALL visible column headers exactly as shown, then extract every row of values beneath them.
@@ -44,7 +44,7 @@ SCREENSHOT TYPE CLASSIFIER (screenshot_type):
 - bracket_tournament
 - unknown
 
-GAMECHANGER BATTING COLUMNS TO RECOGNIZE:
+BATTING COLUMNS TO RECOGNIZE:
 AVG, OBP, OPS, PA, AB, R, H, 1B, 2B, 3B, HR, RBI, BB, SO, HBP, SB, CS
 
 Map these into batting_stats when visible:
@@ -58,10 +58,19 @@ Map these into batting_stats when visible:
 - SO or K -> strikeouts
 - SB -> stolen_bases
 
-GAMECHANGER PITCHING STANDARD COLUMNS:
+PITCHING STANDARD COLUMNS:
 IP, BF, P, S, S%, ERA, WHIP, BB, SO, K, H, BAA
 
-GAMECHANGER PITCHING ADVANCED COLUMNS:
+BOX SCORE PITCHING (CRITICAL):
+Box score pitching tables show IP, H, R, ER, BB, SO per pitcher.
+Below the table, apps often show supplemental footer lines:
+- "Pitches-Strikes" with values like "39-24 Waylon W" (total pitches and strikes per pitcher)
+- "Batters Faced" with values like "10 Waylon W"
+Extract these into pitching_stats: total_pitches, strikes, batters_faced for each named pitcher.
+Also include footer lines in raw_extracted_table rows when visible.
+Set screenshot_type to box_score when this layout is detected.
+
+PITCHING ADVANCED COLUMNS:
 FPS%, K/BB, BB/INN, P/IP, P/BF, 123INN, LOO, SM%, FIP, BABIP
 
 Map into pitching_stats when visible:
@@ -95,7 +104,7 @@ Always populate raw_extracted_table when any tabular data is visible:
 }
 
 SCHEDULE / RESULTS SCREENS (CRITICAL):
-GameChanger schedule and results views are often vertical LISTS, not stat tables.
+Schedule and results views are often vertical LISTS, not stat tables.
 - Set screenshot_type to schedule_results when you see past/upcoming games with opponents, dates, and scores.
 - Populate games with one object per visible game row (opponent_name, game_date as YYYY-MM-DD when possible, result W/L/T, runs_for, runs_against).
 - For schedule_results or box_score screenshots, an empty raw_extracted_table is OK when games are populated.
@@ -167,7 +176,7 @@ export async function extractFromScreenshot(
           content: [
             {
               type: "text",
-              text: "Extract all baseball data from this GameChanger screenshot. If this is a stat table, capture exact column headers in raw_extracted_table and map rows into batting_stats or pitching_stats. If this is a schedule/results list, set screenshot_type to schedule_results and populate the games array (opponent, date, W/L, score). Return structured JSON only.",
+              text: "Extract all baseball data from this screenshot. If this is a stat table, capture exact column headers in raw_extracted_table and map rows into batting_stats or pitching_stats. If this is a schedule/results list, set screenshot_type to schedule_results and populate the games array (opponent, date, W/L, score). Return structured JSON only.",
             },
             {
               type: "image_url",
@@ -210,7 +219,7 @@ export async function extractFromScreenshot(
   return extractScheduleFromScreenshot(imageDataUrl, enriched.warnings);
 }
 
-const SCHEDULE_EXTRACTION_PROMPT = `You extract game results from GameChanger schedule or results screenshots.
+const SCHEDULE_EXTRACTION_PROMPT = `You extract game results from schedule or results screenshots.
 
 These screens show a vertical list of games — NOT a batting/pitching stat table.
 Each row typically has: date, opponent team name, W/L result, and score (runs for / runs against).
@@ -257,7 +266,7 @@ async function extractScheduleFromScreenshot(
           content: [
             {
               type: "text",
-              text: "This GameChanger screenshot may be a schedule or results list. Extract every visible game into the games array.",
+              text: "This screenshot may be a schedule or results list. Extract every visible game into the games array.",
             },
             {
               type: "image_url",

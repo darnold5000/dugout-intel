@@ -47,7 +47,7 @@ export function ScreenshotDetailModal({
           <div className="relative h-64 w-full rounded-md bg-muted overflow-hidden">
             <Image
               src={upload.file_url}
-              alt="GameChanger screenshot"
+              alt="Uploaded screenshot"
               fill
               className="object-contain"
               sizes="400px"

@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { StatsLegend } from "@/components/StatsLegend";
 import { formatStat } from "@/lib/utils";
+import { BATTING_STAT_TERMS, pickLegendTerms } from "@/lib/stat-legend";
 import type { ExtractedBattingStat } from "@/types";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
@@ -63,6 +65,17 @@ export function BattingStatsTable({
     });
   }, [stats]);
 
+  const legendTerms = useMemo(
+    () =>
+      pickLegendTerms(
+        BATTING_STAT_TERMS,
+        visibleColumns
+          .filter((col) => col.key !== "player_name")
+          .map((col) => col.label)
+      ),
+    [visibleColumns]
+  );
+
   const sorted = useMemo(() => {
     const copy = [...stats];
     copy.sort((a, b) => {
@@ -99,7 +112,8 @@ export function BattingStatsTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-3">
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left">
@@ -159,6 +173,8 @@ export function BattingStatsTable({
           ))}
         </tbody>
       </table>
+      </div>
+      <StatsLegend terms={legendTerms} />
     </div>
   );
 }

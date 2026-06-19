@@ -292,12 +292,23 @@ export function resolveConsolidationKey(
   return canonicalMap.get(nameKey) ?? nameKey;
 }
 
+export function isScoutablePlayerName(name: string | null | undefined): boolean {
+  if (!name?.trim()) return false;
+  const n = name.trim();
+  if (EXCLUDED_NAMES.has(n.toUpperCase())) return false;
+  // Jersey numbers mis-parsed as player names (common in cropped GC tables)
+  if (/^\d{1,3}$/.test(n)) return false;
+  if (!/[a-zA-Z]/.test(n)) return false;
+  return true;
+}
+
 export function isExcludedPlayerRow(
   playerName: string | null | undefined
 ): boolean {
   if (!playerName?.trim()) return true;
   const parsed = parsePlayerIdentity(playerName, null);
   if (!parsed.player_name) return true;
+  if (!isScoutablePlayerName(parsed.player_name)) return true;
   return EXCLUDED_NAMES.has(parsed.player_name.toUpperCase());
 }
 

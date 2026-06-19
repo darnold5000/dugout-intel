@@ -282,7 +282,7 @@ export function ScreenshotsTab({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground text-center py-8">
-          No screenshots yet. Upload GameChanger screenshots for {opponentName}.
+          No screenshots yet. Upload stat screenshots for {opponentName}.
         </p>
       )}
 

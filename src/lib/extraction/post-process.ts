@@ -1,9 +1,15 @@
+import {
+  applyBoxScorePitchingSupplements,
+} from "@/lib/extraction/box-score-pitching";
 import type {
   AIExtractionResult,
   RawExtractedTable,
   ScreenshotType,
 } from "@/types";
-import { parsePlayerIdentity } from "@/lib/extraction/player-identity";
+import {
+  isExcludedPlayerRow,
+  parsePlayerIdentity,
+} from "@/lib/extraction/player-identity";
 
 type BattingRow = AIExtractionResult["batting_stats"][number];
 type PitchingRow = AIExtractionResult["pitching_stats"][number];
@@ -203,9 +209,21 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
   for (const row of table.rows) {
     if (!row.some((cell) => cell?.trim())) continue;
 
+    const rowText = row.join(" ").toLowerCase();
+    if (
+      (rowText.includes("pitches") && rowText.includes("strike")) ||
+      rowText.includes("batters faced")
+    ) {
+      continue;
+    }
+
+    const rawName = row[nameIdx]?.trim() || null;
+    const identity = parsePlayerIdentity(rawName, null);
+    if (isExcludedPlayerRow(identity.player_name ?? rawName)) continue;
+
     const stat: PitchingRow = {
-      player_name: row[nameIdx]?.trim() || null,
-      jersey_number: null,
+      player_name: identity.player_name,
+      jersey_number: identity.jersey_number,
       innings_pitched: null,
       pitches: null,
       total_pitches: null,
@@ -515,6 +533,18 @@ export function enrichExtractionResult(
         pitchingStats = mergePitchingStats(pitchingStats, pitchingMapped);
         if (screenshotType === "unknown") screenshotType = "pitching_stats";
       }
+    }
+  }
+
+  pitchingStats = applyBoxScorePitchingSupplements(pitchingStats, table);
+
+  if (
+    screenshotType === "box_score" ||
+    screenshotType === "game_summary" ||
+    pitchingStats.some((p) => p.total_pitches != null && p.strikes != null)
+  ) {
+    if (screenshotType === "unknown" && pitchingStats.length > 0) {
+      screenshotType = "box_score";
     }
   }
 
