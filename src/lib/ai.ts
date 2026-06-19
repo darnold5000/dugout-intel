@@ -120,7 +120,7 @@ CRITICAL RULES:
 - Reference players by name AND jersey number when available.
 - For pitching: analyze pitch counts, strikes, balls, strike %, innings pitched, and pitcher roles.
 - Use the pre-computed pitching staff analysis when provided.
-- Pool play usage is weaker evidence than bracket/championship usage — say so.
+- Weight scout notes by the \`weight\` field (1-5). Championship/bracket and pitching box scores are highest weight; pool play is lower.
 - Baseball innings: 2.1 IP = 2 and 1/3 innings, NOT 2.1 decimal innings.
 - Do NOT invent stats. Do NOT contradict the structured intelligence.
 

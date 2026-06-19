@@ -90,7 +90,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "No evidence available. Add screenshots, notes, voice notes, or documents first.",
+          "No scout notes available. Add screenshots, notes, voice memos, or documents first.",
       },
       { status: 400 }
     );

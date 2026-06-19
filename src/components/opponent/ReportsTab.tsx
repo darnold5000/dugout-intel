@@ -17,9 +17,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
+import { GameDayCard } from "@/components/opponent/GameDayCard";
+import { reportNeedsRefresh } from "@/lib/scouting/opponent-dashboard";
 import { getAuthHeaders } from "@/lib/auth-headers";
 import { formatDate } from "@/lib/utils";
-import type { ScoutingReport, ScoutingReportJson } from "@/types";
+import type { OpponentDetail, ScoutingReport, ScoutingReportJson } from "@/types";
 import {
   Sparkles,
   Trash2,
@@ -28,6 +30,7 @@ import {
   Download,
   Maximize2,
   Check,
+  RefreshCw,
 } from "lucide-react";
 
 const REPORT_TITLES = [
@@ -39,12 +42,16 @@ const REPORT_TITLES = [
 
 interface ReportsTabProps {
   opponentId: string;
+  opponentName: string;
+  data: OpponentDetail;
   reports: ScoutingReport[];
   onRefresh: () => Promise<void>;
 }
 
 export function ReportsTab({
   opponentId,
+  opponentName,
+  data,
   reports,
   onRefresh,
 }: ReportsTabProps) {
@@ -64,6 +71,7 @@ export function ReportsTab({
   const latestReportId = reports[0]?.id;
   const latestReport = reports[0] ?? null;
   const displayReport = selectedReport ?? latestReport;
+  const stale = reportNeedsRefresh(data);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -170,12 +178,41 @@ export function ReportsTab({
 
   return (
     <div className="space-y-6">
+      {stale && (
+        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <p className="font-medium text-sm">Scout notes changed</p>
+              <p className="text-sm text-muted-foreground">
+                Your scouting report may be out of date. Refresh it to include
+                the latest notes and screenshots.
+              </p>
+            </div>
+            <Button onClick={handleGenerate} disabled={generating}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {generating ? "Refreshing..." : "Refresh Report"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <GameDayCard
+        opponentName={opponentName}
+        data={data}
+        report={displayReport}
+      />
+
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader>
           <CardTitle className="text-lg">Generate Scouting Report</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Turn your evidence into a coach-ready scouting report.
+            Turn scout notes into a coach-ready report.
           </p>
+          {latestReport && !stale && (
+            <p className="text-xs text-muted-foreground">
+              Report current as of {formatDate(latestReport.created_at)}
+            </p>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
@@ -240,7 +277,8 @@ export function ReportsTab({
 
       {reports.length === 0 && !generating && (
         <p className="text-sm text-muted-foreground">
-          No reports yet. Add evidence in the Evidence tab, then generate your first scouting report.
+          No reports yet. Add scout notes, then generate your first scouting
+          report.
         </p>
       )}
 

@@ -98,26 +98,20 @@ export default async function OpponentDetailPage({
     <div className="min-h-screen bg-muted/20">
       <AppHeader userEmail={user?.email} />
       <main className="container mx-auto px-4 py-8">
-        <Button variant="ghost" size="sm" asChild className="mb-4">
+        <Button variant="ghost" size="sm" asChild className="mb-2">
           <Link href="/opponents">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to opponents
           </Link>
         </Button>
 
-        <div className="mb-8">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{opponent.name}</h1>
-            <Badge variant="secondary">{opponent.age_level}</Badge>
-          </div>
+        <div className="mb-4 flex items-center gap-3">
+          <Badge variant="secondary">{opponent.age_level}</Badge>
           {opponent.location && (
-            <p className="text-muted-foreground mt-1 flex items-center gap-1">
+            <p className="text-sm text-muted-foreground flex items-center gap-1">
               <MapPin className="h-4 w-4" />
               {opponent.location}
             </p>
-          )}
-          {opponent.notes && (
-            <p className="text-sm text-muted-foreground mt-2">{opponent.notes}</p>
           )}
         </div>
 

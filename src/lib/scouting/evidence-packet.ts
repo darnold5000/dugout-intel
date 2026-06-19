@@ -1,4 +1,5 @@
 import { analyzePitchingStaff, formatPitchingStaffRead } from "@/lib/scouting/pitching-analysis";
+import { getScoutNoteWeight } from "@/lib/scouting/evidence-timeline";
 import type { OpponentDetail } from "@/types";
 
 export interface EvidencePacket {
@@ -11,6 +12,7 @@ export interface EvidencePacket {
     game_type: string | null;
     opponent_played: string | null;
     tournament_name: string | null;
+    weight: number;
   }[];
   notes: {
     id: string;
@@ -20,6 +22,7 @@ export interface EvidencePacket {
     game_date: string | null;
     game_type: string | null;
     opponent_played: string | null;
+    weight: number;
   }[];
   voiceNotes: {
     id: string;
@@ -28,12 +31,14 @@ export interface EvidencePacket {
     game_type: string | null;
     game_date: string | null;
     opponent_played: string | null;
+    weight: number;
   }[];
   documents: {
     id: string;
     file_name: string;
     file_type: string | null;
     extracted_text: string | null;
+    weight: number;
   }[];
   gameContexts: {
     id: string;
@@ -46,6 +51,7 @@ export interface EvidencePacket {
     reason_pitcher_entered: string | null;
     leverage: string | null;
     notes: string | null;
+    weight: number;
   }[];
   consolidatedStats: {
     players: unknown[];
@@ -76,6 +82,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       game_type: s.game_type ?? null,
       opponent_played: s.opponent_played ?? null,
       tournament_name: s.tournament_name ?? null,
+      weight: getScoutNoteWeight("screenshot", s.game_type, s.screenshot_type),
     }));
 
   const notes = (data.opponent_notes ?? [])
@@ -88,6 +95,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       game_date: n.game_date,
       game_type: n.game_type,
       opponent_played: n.opponent_played ?? null,
+      weight: getScoutNoteWeight("note", n.game_type),
     }));
 
   const voiceNotes = (data.opponent_voice_notes ?? [])
@@ -99,6 +107,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       game_type: v.game_type,
       game_date: v.game_date ?? null,
       opponent_played: v.opponent_played ?? null,
+      weight: getScoutNoteWeight("voice", v.game_type),
     }));
 
   const documents = (data.opponent_documents ?? [])
@@ -108,6 +117,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       file_name: d.file_name,
       file_type: d.file_type,
       extracted_text: d.extracted_text,
+      weight: getScoutNoteWeight("document"),
     }));
 
   const gameContexts = (data.opponent_game_context ?? [])
@@ -123,6 +133,7 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       reason_pitcher_entered: g.reason_pitcher_entered,
       leverage: g.leverage,
       notes: g.notes,
+      weight: getScoutNoteWeight("game_context", g.game_type),
     }));
 
   const pitchingAnalysis = analyzePitchingStaff(

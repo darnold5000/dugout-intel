@@ -23,6 +23,7 @@ import { getAuthHeaders } from "@/lib/auth-headers";
 import {
   buildEvidenceLibrary,
   buildEvidenceTimeline,
+  importanceStars,
   type EvidenceKind,
   type EvidenceLibraryItem,
 } from "@/lib/scouting/evidence-timeline";
@@ -36,6 +37,8 @@ import type {
 } from "@/types";
 import {
   Camera,
+  ChevronLeft,
+  ChevronRight,
   ChevronDown,
   ChevronUp,
   FileText,
@@ -112,7 +115,7 @@ function IncludedToggle({
   );
 }
 
-export function EvidenceTab({
+export function ScoutNotesTab({
   opponentId,
   opponentName,
   data,
@@ -146,8 +149,14 @@ export function EvidenceTab({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+
   const library = useMemo(() => buildEvidenceLibrary(data), [data]);
   const timeline = useMemo(() => buildEvidenceTimeline(data), [data]);
+  const screenshotItems = useMemo(
+    () => library.filter((i) => i.kind === "screenshot" && i.screenshot),
+    [library]
+  );
 
   const pendingUploads = useMemo(
     () =>
@@ -355,7 +364,7 @@ export function EvidenceTab({
       setShowContext(false);
       await onRefresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save evidence");
+      setError(err instanceof Error ? err.message : "Failed to save scout note");
     } finally {
       setSubmitting(false);
     }
@@ -685,7 +694,7 @@ export function EvidenceTab({
                   !showContext)
               }
             >
-              {submitting ? "Saving..." : "Add Evidence"}
+              {submitting ? "Saving..." : "Save Scout Note"}
             </Button>
           </div>
 
@@ -829,7 +838,7 @@ export function EvidenceTab({
 
       {timeline.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold mb-4">Evidence Timeline</h2>
+          <h2 className="text-sm font-semibold mb-4">Scout Notes Timeline</h2>
           <div className="space-y-6">
             {timeline.map((group) => (
               <div key={group.key} className="relative pl-4 border-l-2 border-muted">
@@ -837,11 +846,19 @@ export function EvidenceTab({
                   <p className="font-medium text-sm">{group.heading}</p>
                   <p className="text-xs text-muted-foreground">{group.subtitle}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
                   {group.items.map((item) => (
-                    <Badge key={item.id} variant="outline" className="text-xs font-normal">
-                      {KIND_ICONS[item.kind]} {item.title}
-                    </Badge>
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-2 text-sm"
+                    >
+                      <span>
+                        {KIND_ICONS[item.kind]} {item.title}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {importanceStars(item.importance)}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -850,14 +867,96 @@ export function EvidenceTab({
         </section>
       )}
 
+      {screenshotItems.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold mb-3">Screenshot Review</h2>
+          <Card className="overflow-hidden">
+            <div className="relative w-full aspect-[3/4] max-h-[70vh] bg-muted">
+              {(() => {
+                const idx = galleryIndex ?? 0;
+                const item = screenshotItems[idx];
+                const upload = item?.screenshot;
+                if (!upload) return null;
+                return (
+                  <Image
+                    src={upload.file_url}
+                    alt={item.title}
+                    fill
+                    className="object-contain"
+                    sizes="100vw"
+                    priority
+                  />
+                );
+              })()}
+            </div>
+            <CardContent className="p-4 space-y-3">
+              {(() => {
+                const idx = galleryIndex ?? 0;
+                const item = screenshotItems[idx];
+                if (!item?.screenshot) return null;
+                const upload = item.screenshot;
+                return (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.subtitle} · {importanceStars(item.importance)}
+                        </p>
+                      </div>
+                      <ExtractionStatusBadge status={upload.extraction_status} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={idx <= 0}
+                        onClick={() => setGalleryIndex(Math.max(0, idx - 1))}
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={idx >= screenshotItems.length - 1}
+                        onClick={() =>
+                          setGalleryIndex(
+                            Math.min(screenshotItems.length - 1, idx + 1)
+                          )
+                        }
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground self-center">
+                        {idx + 1} of {screenshotItems.length}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDetailUpload(upload)}
+                      >
+                        <Maximize2 className="h-3 w-3 mr-1" />
+                        Expand
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       <section>
         <h2 className="text-sm font-semibold mb-4">
-          Evidence Library ({library.length})
+          Scout Notes Library ({library.length})
         </h2>
         {library.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              No evidence yet. Tell us what you know about this team above.
+              No scout notes yet. Tell us what you know about this team above.
             </CardContent>
           </Card>
         ) : (
@@ -879,7 +978,7 @@ export function EvidenceTab({
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove this evidence?</DialogTitle>
+            <DialogTitle>Remove this screenshot?</DialogTitle>
             <DialogDescription>
               This screenshot will be deleted and consolidated stats will update.
             </DialogDescription>

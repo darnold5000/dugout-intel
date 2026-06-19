@@ -20,6 +20,12 @@ export interface PitcherAnalysis {
   label: string;
   roleLabels: PitcherRoleLabel[];
   roleConfidence: "low" | "medium" | "high";
+  /** Coach-facing summary fields */
+  role: string;
+  workload: "Heavy" | "Medium" | "Light" | "Unknown";
+  strikeThrower: boolean;
+  controlRisk: "Low" | "Medium" | "High";
+  likelyUsage: string;
   inningsPitched: number | null;
   inningsPitchedDisplay: string | null;
   pitches: number | null;
@@ -227,12 +233,52 @@ export function analyzePitchingStaff(
         coachTakeaway = "Limited usage data — treat as depth unless bracket notes say otherwise.";
       }
 
+      const strikeThrower =
+        stat.strike_percentage != null && stat.strike_percentage >= 0.62;
+      const walksPerInning =
+        ip != null && ip > 0 && stat.walks != null ? stat.walks / ip : null;
+      let controlRisk: "Low" | "Medium" | "High" = "Medium";
+      if (walksPerInning != null) {
+        if (walksPerInning < 0.5) controlRisk = "Low";
+        else if (walksPerInning >= 1) controlRisk = "High";
+      }
+
+      let workload: "Heavy" | "Medium" | "Light" | "Unknown" = "Unknown";
+      if (ip != null) {
+        if (ip >= 4 || (stat.pitches ?? 0) >= maxPitches * 0.85) workload = "Heavy";
+        else if (ip >= 2) workload = "Medium";
+        else workload = "Light";
+      }
+
+      let role = "Depth";
+      if (uniqueRoles.includes("Likely Main Pitcher")) role = "Ace";
+      else if (uniqueRoles.includes("High-Leverage Arm")) role = "High-Leverage";
+      else if (uniqueRoles.includes("Strike Thrower")) role = "Strike Thrower";
+
+      let likelyUsage = "Unknown usage";
+      if (bracketAppearances > 0 && highLeverageSignals > 0) {
+        likelyUsage = "Bracket relief / high-leverage";
+      } else if (bracketAppearances > 0) {
+        likelyUsage = "Bracket game appearance";
+      } else if (uniqueRoles.includes("Likely Main Pitcher")) {
+        likelyUsage = "Likely bracket starter";
+      } else if (workload === "Heavy") {
+        likelyUsage = "Primary workload arm";
+      } else if (workload === "Light") {
+        likelyUsage = "Spot / depth usage";
+      }
+
       return {
         playerName: stat.player_name,
         jerseyNumber: stat.jersey_number,
         label,
         roleLabels: uniqueRoles,
         roleConfidence,
+        role,
+        workload,
+        strikeThrower,
+        controlRisk,
+        likelyUsage,
         inningsPitched: ip,
         inningsPitchedDisplay: ip != null ? formatBaseballInnings(ip) : null,
         pitches: stat.pitches,

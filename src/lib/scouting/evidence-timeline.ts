@@ -26,6 +26,7 @@ export interface EvidenceLibraryItem {
   tournamentName?: string;
   opponentPlayed?: string;
   includedInReport: boolean;
+  importance: number;
   screenshot?: ScreenshotUpload;
   note?: OpponentNote;
   voice?: OpponentVoiceNote;
@@ -60,6 +61,47 @@ const SCREENSHOT_TYPE_LABELS: Record<string, string> = {
   roster: "Roster",
   unknown: "Screenshot",
 };
+
+function screenshotImportance(type: string | null | undefined): number {
+  if (type === "pitching_stats" || type === "box_score") return 5;
+  if (type === "batting_stats" || type === "game_summary") return 4;
+  if (type === "bracket_tournament" || type === "schedule_results") return 3;
+  return 3;
+}
+
+function gameTypeImportance(gameType?: string | null): number {
+  if (gameType === "championship") return 5;
+  if (gameType === "bracket_play") return 5;
+  if (gameType === "pool_play") return 2;
+  return 3;
+}
+
+function kindImportance(
+  kind: EvidenceKind,
+  gameType?: string | null,
+  screenshotType?: string | null
+): number {
+  if (kind === "screenshot") return screenshotImportance(screenshotType);
+  if (kind === "game_context") return gameTypeImportance(gameType);
+  if (kind === "note" || kind === "voice") {
+    const base = gameTypeImportance(gameType);
+    return kind === "voice" ? Math.min(5, base + 1) : base === 2 ? 4 : base;
+  }
+  if (kind === "document") return 3;
+  return 2;
+}
+
+export function getScoutNoteWeight(
+  kind: EvidenceKind,
+  gameType?: string | null,
+  screenshotType?: string | null
+): number {
+  return kindImportance(kind, gameType, screenshotType);
+}
+
+export function importanceStars(importance: number): string {
+  return "⭐".repeat(Math.max(1, Math.min(5, importance)));
+}
 
 function gameTypeLabel(value?: string | null): string {
   if (!value || value === "unknown") return "";
@@ -98,6 +140,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       tournamentName: upload.tournament_name ?? undefined,
       opponentPlayed: upload.opponent_played ?? undefined,
       includedInReport: upload.included_in_report !== false,
+      importance: kindImportance("screenshot", upload.game_type, type),
       screenshot: upload,
     });
   }
@@ -113,6 +156,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       gameType: note.game_type,
       opponentPlayed: note.opponent_played ?? undefined,
       includedInReport: note.included_in_report,
+      importance: kindImportance("note", note.game_type),
       note,
     });
   }
@@ -128,6 +172,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       gameType: voice.game_type,
       opponentPlayed: voice.opponent_played ?? undefined,
       includedInReport: voice.included_in_report,
+      importance: kindImportance("voice", voice.game_type),
       voice,
     });
   }
@@ -141,6 +186,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       subtitle: formatDate(doc.created_at),
       date: doc.created_at.slice(0, 10),
       includedInReport: doc.included_in_report,
+      importance: kindImportance("document"),
       document: doc,
     });
   }
@@ -157,6 +203,7 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
       tournamentName: ctx.tournament_name ?? undefined,
       opponentPlayed: ctx.opponent_played ?? undefined,
       includedInReport: ctx.included_in_report,
+      importance: kindImportance("game_context", ctx.game_type),
       gameContext: ctx,
     });
   }
@@ -206,3 +253,5 @@ export function evidenceSourceCount(data: OpponentDetail): number {
     (data.opponent_game_context?.length ?? 0)
   );
 }
+
+export const scoutNotesCount = evidenceSourceCount;
