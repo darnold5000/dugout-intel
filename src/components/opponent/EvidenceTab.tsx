@@ -72,6 +72,8 @@ const GAME_TYPES = [
   { value: "unknown", label: "Unknown" },
   { value: "pool_play", label: "Pool Play" },
   { value: "bracket_play", label: "Bracket Play" },
+  { value: "quarterfinal", label: "Quarterfinal" },
+  { value: "semifinal", label: "Semifinal" },
   { value: "championship", label: "Championship" },
   { value: "friendly", label: "Friendly" },
   { value: "scrimmage", label: "Scrimmage" },

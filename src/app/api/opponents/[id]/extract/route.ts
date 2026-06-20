@@ -192,7 +192,8 @@ export async function POST(
       const rebuilt = await rebuildOpponentStats(
         supabase,
         opponentId,
-        freshExtractions
+        freshExtractions,
+        { userId: user!.id }
       );
       consolidatedCounts = rebuilt.counts;
       consolidateWarnings = rebuilt.warnings;

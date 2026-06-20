@@ -24,11 +24,30 @@ export type GameType =
   | "unknown"
   | "pool_play"
   | "bracket_play"
+  | "quarterfinal"
+  | "semifinal"
   | "championship"
   | "friendly"
   | "scrimmage";
 
-export type Leverage = "low" | "medium" | "high";
+export type Leverage = "low" | "medium" | "high" | "critical";
+
+export type PitchingAvailability =
+  | "available"
+  | "limited"
+  | "emergency_only"
+  | "unavailable";
+
+export type LedgerSourceType =
+  | "screenshot"
+  | "box_score"
+  | "pitching_stats"
+  | "schedule"
+  | "scout_note"
+  | "voice_note"
+  | "document"
+  | "game_context"
+  | "recap";
 
 export type ReasonPitcherEntered =
   | "unknown"
@@ -149,6 +168,87 @@ export interface OpponentGameContext {
   included_in_report: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface PitchingRuleProfile {
+  id: string;
+  user_id: string;
+  name: string;
+  age_level: string | null;
+  rules_json: PitchingRulesConfig;
+  is_default: boolean;
+  created_at: string;
+}
+
+/** Configurable USSSA-style pitching limits — not hardcoded in logic. */
+export interface PitchingRulesConfig {
+  max_innings_per_day?: number;
+  innings_trigger_rest_day?: number;
+  rest_days_after_heavy_day?: number;
+  max_innings_rolling_window?: number;
+  rolling_window_days?: number;
+  max_pitches_per_day?: number;
+  tournament_innings_cap?: number;
+}
+
+export interface PitchingLedgerEntry {
+  id: string;
+  opponent_id: string;
+  user_id: string;
+  player_name: string | null;
+  jersey_number: string | null;
+  game_date: string | null;
+  opponent_played: string | null;
+  game_type: GameType | string;
+  tournament_name: string | null;
+  innings_pitched: number | null;
+  pitch_count: number | null;
+  batters_faced: number | null;
+  strikeouts: number | null;
+  walks: number | null;
+  hits_allowed: number | null;
+  started_game: boolean | null;
+  finished_game: boolean | null;
+  entered_inning: string | null;
+  score_when_entered: string | null;
+  leverage: Leverage | string;
+  source_type: LedgerSourceType | string;
+  source_reference: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PitcherLedgerSummary {
+  playerKey: string;
+  playerName: string | null;
+  jerseyNumber: string | null;
+  label: string;
+  totalInnings: number;
+  totalPitches: number;
+  gameCount: number;
+  poolAppearances: number;
+  bracketAppearances: number;
+  championshipAppearances: number;
+  finishedGames: number;
+  importanceScore: number;
+  importanceAssessment: string;
+  availability: PitchingAvailability;
+  availabilityConfidence: "low" | "medium" | "high";
+  remainingInningsEstimate: number | null;
+  weekendCapacityPct: number | null;
+  roleLabels: string[];
+  appearances: PitchingLedgerEntry[];
+}
+
+export interface PitchingLedgerOutlook {
+  likelyStarter: PitcherLedgerSummary | null;
+  primaryRelief: PitcherLedgerSummary | null;
+  likelyCloser: PitcherLedgerSummary | null;
+  unavailable: PitcherLedgerSummary[];
+  limited: PitcherLedgerSummary[];
+  available: PitcherLedgerSummary[];
+  depthRating: "Thin" | "Moderate" | "Deep";
+  ace: PitcherLedgerSummary | null;
 }
 
 export interface ExtractedPlayer {
@@ -448,6 +548,7 @@ export interface OpponentDetail extends Opponent {
   opponent_documents?: OpponentDocument[];
   opponent_voice_notes?: OpponentVoiceNote[];
   opponent_game_context?: OpponentGameContext[];
+  pitching_ledger_entries?: PitchingLedgerEntry[];
   extracted_players: ExtractedPlayer[];
   extracted_batting_stats: ExtractedBattingStat[];
   extracted_pitching_stats: ExtractedPitchingStat[];

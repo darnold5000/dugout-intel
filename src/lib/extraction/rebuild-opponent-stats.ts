@@ -11,12 +11,21 @@ import {
   extractionFromRawTable,
   type ConsolidatedPitchingRow,
 } from "@/lib/extraction/consolidate-stats";
+import { rebuildPitchingLedger } from "@/lib/extraction/rebuild-pitching-ledger";
+import type { OpponentDetail } from "@/types";
 
 interface CompleteUpload {
   id: string;
   created_at: string;
   screenshot_type: string | null;
   raw_extracted_table: AIExtractionResult["raw_extracted_table"] | null;
+  game_date?: string | null;
+  opponent_played?: string | null;
+  tournament_name?: string | null;
+  game_type?: string | null;
+  file_url?: string;
+  file_path?: string;
+  extraction_status?: string;
 }
 
 const EARNED_RUNS_MIGRATION_SQL =
@@ -80,11 +89,13 @@ export async function rebuildOpponentStats(
   supabase: SupabaseClient,
   opponentId: string,
   freshExtractions: Map<string, AIExtractionResult> = new Map(),
-  options: { includeDiagnostics?: boolean } = {}
+  options: { includeDiagnostics?: boolean; userId?: string } = {}
 ): Promise<RebuildResult> {
   const { data: uploads, error: fetchError } = await supabase
     .from("screenshot_uploads")
-    .select("id, created_at, screenshot_type, raw_extracted_table, extraction_status")
+    .select(
+      "id, created_at, screenshot_type, raw_extracted_table, extraction_status, game_date, opponent_played, tournament_name, game_type, file_url, file_path"
+    )
     .eq("opponent_id", opponentId)
     .not("raw_extracted_table", "is", null)
     .neq("extraction_status", "processing")
@@ -231,6 +242,52 @@ export async function rebuildOpponentStats(
 
   const playerCount = consolidated.players.length;
   const battingCount = consolidated.batting_stats.length;
+
+  if (options.userId) {
+    const [
+      { data: opponent_notes },
+      { data: opponent_voice_notes },
+      { data: opponent_documents },
+      { data: opponent_game_context },
+    ] = await Promise.all([
+      supabase.from("opponent_notes").select("*").eq("opponent_id", opponentId),
+      supabase.from("opponent_voice_notes").select("*").eq("opponent_id", opponentId),
+      supabase.from("opponent_documents").select("*").eq("opponent_id", opponentId),
+      supabase.from("opponent_game_context").select("*").eq("opponent_id", opponentId),
+    ]);
+
+    const ledgerData: OpponentDetail = {
+      id: opponentId,
+      user_id: options.userId,
+      team_id: null,
+      name: "",
+      age_level: "",
+      location: null,
+      notes: null,
+      created_at: "",
+      updated_at: "",
+      screenshot_uploads: (uploads ?? []) as OpponentDetail["screenshot_uploads"],
+      opponent_notes: opponent_notes ?? [],
+      opponent_voice_notes: opponent_voice_notes ?? [],
+      opponent_documents: opponent_documents ?? [],
+      opponent_game_context: opponent_game_context ?? [],
+      extracted_players: [],
+      extracted_batting_stats: [],
+      extracted_pitching_stats: [],
+      extracted_games: [],
+      scouting_reports: [],
+    };
+
+    const ledgerResult = await rebuildPitchingLedger(
+      supabase,
+      opponentId,
+      options.userId,
+      ledgerData
+    );
+    if (ledgerResult.warning) {
+      rebuildWarnings.push(ledgerResult.warning);
+    }
+  }
 
   return {
     counts: {

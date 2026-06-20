@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OverviewTab } from "@/components/opponent/OverviewTab";
 import { ScoutNotesTab } from "@/components/opponent/EvidenceTab";
 import { PitchingTab } from "@/components/opponent/PitchingTab";
+import { PitchingLedgerTab } from "@/components/opponent/PitchingLedgerTab";
 import { ReportsTab } from "@/components/opponent/ReportsTab";
 import { OpponentDashboardHero } from "@/components/opponent/OpponentDashboardHero";
 import { getAuthHeaders } from "@/lib/auth-headers";
@@ -66,6 +67,9 @@ export function OpponentWorkspace({
             <TabsTrigger value="pitching" className="flex-1 sm:flex-none">
               Pitching
             </TabsTrigger>
+            <TabsTrigger value="pitching-ledger" className="flex-1 sm:flex-none">
+              Pitching Ledger
+            </TabsTrigger>
             <TabsTrigger value="report" className="flex-1 sm:flex-none">
               Scouting Report ({data.scouting_reports.length})
             </TabsTrigger>
@@ -91,6 +95,10 @@ export function OpponentWorkspace({
 
         <TabsContent value="pitching">
           <PitchingTab data={data} onSwitchTab={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="pitching-ledger">
+          <PitchingLedgerTab data={data} onSwitchTab={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="report">

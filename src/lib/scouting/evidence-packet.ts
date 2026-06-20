@@ -3,6 +3,12 @@ import {
   formatPitchingStaffRead,
   type PitcherAnalysis,
 } from "@/lib/scouting/pitching-analysis";
+import {
+  buildPitcherSummaries,
+  buildPitchingLedgerOutlook,
+  formatTournamentPitchingIntelligence,
+} from "@/lib/scouting/ledger-aggregate";
+import { resolveLedgerEntries } from "@/lib/scouting/resolve-ledger";
 import { getScoutNoteWeight } from "@/lib/scouting/evidence-timeline";
 import { buildGameResultsSummary } from "@/lib/scouting/game-results";
 import type { OpponentDetail } from "@/types";
@@ -70,6 +76,7 @@ export interface EvidencePacket {
   };
   pitchingAnalysis: PitcherAnalysis[];
   pitchingStaffRead: string;
+  tournamentPitchingRead: string;
   evidenceCounts: {
     screenshots: number;
     notes: number;
@@ -151,6 +158,9 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
   const gameResultsSummary = buildGameResultsSummary(data);
 
   const pitchingAnalysis = analyzePitchingStaffFromDetail(data);
+  const ledgerEntries = resolveLedgerEntries(data);
+  const ledgerSummaries = buildPitcherSummaries(ledgerEntries);
+  const ledgerOutlook = buildPitchingLedgerOutlook(ledgerSummaries);
 
   return {
     screenshots,
@@ -167,6 +177,10 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
     },
     pitchingAnalysis,
     pitchingStaffRead: formatPitchingStaffRead(pitchingAnalysis),
+    tournamentPitchingRead: formatTournamentPitchingIntelligence(
+      ledgerSummaries,
+      ledgerOutlook
+    ),
     evidenceCounts: {
       screenshots: screenshots.length,
       notes: notes.length,

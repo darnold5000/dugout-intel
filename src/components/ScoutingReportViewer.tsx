@@ -113,7 +113,7 @@ export function ScoutingReportViewer({
         <ReportSection title="Executive Summary" content={data.executive_summary ?? data.opponent_summary} />
         <ReportSection title="Key Players To Know" list={data.key_players ?? data.players_to_watch} />
         <ReportSection title="Pitching Staff Breakdown" content={data.pitching_staff_breakdown ?? data.pitching_notes} />
-        <ReportSection title="Pitcher Usage / Game Context" content={data.pitcher_usage_context} />
+        <ReportSection title="Tournament Pitching Intelligence" content={data.pitcher_usage_context} />
         <ReportSection title="Offensive Threats" content={data.offensive_threats ?? data.offensive_tendencies} />
         <ReportSection title="Baserunning Threats" content={data.baserunning_threats} />
         <ReportSection title="Weaknesses To Attack" content={data.weaknesses_to_attack ?? data.weaknesses_opportunities} />

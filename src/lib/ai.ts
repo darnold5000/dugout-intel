@@ -433,6 +433,7 @@ Write practical advice for a youth baseball coach preparing to play this team.`,
 
   const reportJson = intelligenceToReportJson(intelligence, aiNarrative, {
     pitchingStaffBreakdown: data.evidencePacket.pitchingStaffRead,
+    pitcherUsageContext: data.evidencePacket.tournamentPitchingRead,
   });
   const reportText = formatIntelligenceReportText(data.opponentName, reportJson);
 

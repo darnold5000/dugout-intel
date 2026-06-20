@@ -4,6 +4,12 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { buildGameDaySummary } from "@/lib/scouting/game-day-summary";
+import {
+  buildPitcherSummaries,
+  buildPitchingLedgerOutlook,
+  formatAvailability,
+} from "@/lib/scouting/ledger-aggregate";
+import { resolveLedgerEntries } from "@/lib/scouting/resolve-ledger";
 import type { OpponentDetail, ScoutingReport } from "@/types";
 import { Printer } from "lucide-react";
 
@@ -45,6 +51,13 @@ export function GameDayCard({ opponentName, data, report }: GameDayCardProps) {
     () => buildGameDaySummary(opponentName, data),
     [opponentName, data]
   );
+
+  const ledgerOutlook = useMemo(() => {
+    const entries = resolveLedgerEntries(data);
+    if (!entries.length) return null;
+    const summaries = buildPitcherSummaries(entries);
+    return buildPitchingLedgerOutlook(summaries);
+  }, [data]);
 
   const reportJson = report?.report_json;
   const gamePlan =
@@ -113,6 +126,41 @@ export function GameDayCard({ opponentName, data, report }: GameDayCardProps) {
           value={summary.biggestOpportunity}
         />
         <SummaryRow label="Biggest Threat" value={summary.biggestThreat} />
+
+        {ledgerOutlook && (
+          <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">
+              Tomorrow Pitching Outlook
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <SummaryRow
+                label="Likely Starter"
+                value={ledgerOutlook.likelyStarter?.label ?? "—"}
+              />
+              <SummaryRow
+                label="Likely Closer"
+                value={ledgerOutlook.likelyCloser?.label ?? "—"}
+              />
+              <SummaryRow
+                label="Unavailable"
+                value={
+                  ledgerOutlook.unavailable.length
+                    ? ledgerOutlook.unavailable
+                        .map(
+                          (p) =>
+                            `${p.label} (${formatAvailability(p.availability)})`
+                        )
+                        .join(", ")
+                    : "None flagged"
+                }
+              />
+              <SummaryRow
+                label="Pitching Depth"
+                value={ledgerOutlook.depthRating}
+              />
+            </div>
+          </div>
+        )}
 
         <div>
           <p className="font-semibold text-xs text-muted-foreground mb-1">

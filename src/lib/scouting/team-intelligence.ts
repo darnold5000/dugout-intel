@@ -748,6 +748,7 @@ export function intelligenceToReportJson(
   }>,
   extras?: {
     pitchingStaffBreakdown?: string;
+    pitcherUsageContext?: string;
   }
 ): import("@/types").ScoutingReportJson {
   const { teamIdentity, confidenceByCategory } = intelligence;
@@ -811,6 +812,7 @@ export function intelligenceToReportJson(
     offensive_threats: offensiveTendencies,
     pitching_notes: pitchingNotes,
     pitching_staff_breakdown: extras?.pitchingStaffBreakdown ?? pitchingNotes,
+    pitcher_usage_context: extras?.pitcherUsageContext ?? "",
     recommended_game_plan:
       aiNarrative?.suggested_game_plan ??
       [

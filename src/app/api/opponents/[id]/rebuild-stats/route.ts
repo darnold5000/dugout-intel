@@ -32,7 +32,9 @@ export async function POST(
   try {
     const result = await rebuildOpponentStats(
       supabase,
-      opponentId
+      opponentId,
+      undefined,
+      { userId: user.id }
     );
 
     return NextResponse.json({

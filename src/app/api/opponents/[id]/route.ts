@@ -37,6 +37,7 @@ export async function GET(
     { data: extracted_pitching_stats },
     { data: extracted_games },
     { data: scouting_reports },
+    { data: pitching_ledger_entries },
   ] = await Promise.all([
     supabase
       .from("screenshot_uploads")
@@ -72,6 +73,11 @@ export async function GET(
       .select("*")
       .eq("opponent_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("pitching_ledger_entries")
+      .select("*")
+      .eq("opponent_id", id)
+      .order("game_date", { ascending: true }),
   ]);
 
   return NextResponse.json({
@@ -81,6 +87,7 @@ export async function GET(
     opponent_documents: opponent_documents ?? [],
     opponent_voice_notes: opponent_voice_notes ?? [],
     opponent_game_context: opponent_game_context ?? [],
+    pitching_ledger_entries: pitching_ledger_entries ?? [],
     extracted_players: extracted_players ?? [],
     extracted_batting_stats: extracted_batting_stats ?? [],
     extracted_pitching_stats: extracted_pitching_stats ?? [],
