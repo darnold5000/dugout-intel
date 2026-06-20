@@ -95,6 +95,7 @@ CREATE TABLE extracted_pitching_stats (
   strikeouts INTEGER,
   hits_allowed INTEGER,
   runs_allowed INTEGER,
+  earned_runs INTEGER,
   k_bb_ratio NUMERIC,
   walks_per_inning NUMERIC,
   pitches_per_inning NUMERIC,

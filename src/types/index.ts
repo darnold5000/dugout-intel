@@ -204,6 +204,7 @@ export interface ExtractedPitchingStat {
   strikeouts: number | null;
   hits_allowed: number | null;
   runs_allowed: number | null;
+  earned_runs: number | null;
   k_bb_ratio: number | null;
   walks_per_inning: number | null;
   pitches_per_inning: number | null;
@@ -415,6 +416,7 @@ export interface AIExtractionResult {
     strikeouts: number | null;
     hits_allowed: number | null;
     runs_allowed: number | null;
+    earned_runs: number | null;
     k_bb_ratio: number | null;
     walks_per_inning: number | null;
     pitches_per_inning: number | null;

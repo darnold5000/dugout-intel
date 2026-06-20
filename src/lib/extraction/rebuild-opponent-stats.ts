@@ -152,6 +152,7 @@ export async function rebuildOpponentStats(
       strikeouts: stat.strikeouts,
       hits_allowed: stat.hits_allowed,
       runs_allowed: stat.runs_allowed,
+      earned_runs: stat.earned_runs,
       k_bb_ratio: stat.k_bb_ratio,
       walks_per_inning: stat.walks_per_inning,
       pitches_per_inning: stat.pitches_per_inning,

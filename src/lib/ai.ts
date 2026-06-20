@@ -84,7 +84,8 @@ Map into pitching_stats when visible:
 - BB -> walks
 - SO or K -> strikeouts
 - H -> hits_allowed
-- R or ER -> runs_allowed
+- R -> runs_allowed
+- ER -> earned_runs
 - BAA -> baa (decimal, e.g. .278 -> 0.278)
 - K/BB -> k_bb_ratio
 - BB/INN -> walks_per_inning
@@ -125,7 +126,7 @@ Return ONLY valid JSON matching this schema:
   "raw_extracted_table": { "headers": string[], "rows": string[][] },
   "players": [{ "name": string | null, "jersey_number": string | null, "positions": string[] | null, "confidence": number }],
   "batting_stats": [{ "player_name": string | null, "jersey_number": string | null, "avg": number | null, "obp": number | null, "ops": number | null, "hits": number | null, "walks": number | null, "strikeouts": number | null, "rbi": number | null, "runs": number | null, "stolen_bases": number | null, "confidence": number }],
-  "pitching_stats": [{ "player_name": string | null, "jersey_number": string | null, "innings_pitched": number | null, "pitches": number | null, "total_pitches": number | null, "batters_faced": number | null, "strikes": number | null, "strike_percentage": number | null, "first_pitch_strike_pct": number | null, "era": number | null, "walks": number | null, "strikeouts": number | null, "hits_allowed": number | null, "runs_allowed": number | null, "k_bb_ratio": number | null, "walks_per_inning": number | null, "pitches_per_inning": number | null, "pitches_per_batter_faced": number | null, "one_two_three_innings": number | null, "leadoff_outs": number | null, "swing_miss_pct": number | null, "baa": number | null, "babip": number | null, "fip": number | null, "confidence": number }],
+  "pitching_stats": [{ "player_name": string | null, "jersey_number": string | null, "innings_pitched": number | null, "pitches": number | null, "total_pitches": number | null, "batters_faced": number | null, "strikes": number | null, "strike_percentage": number | null, "first_pitch_strike_pct": number | null, "era": number | null, "walks": number | null, "strikeouts": number | null, "hits_allowed": number | null, "runs_allowed": number | null, "earned_runs": number | null, "k_bb_ratio": number | null, "walks_per_inning": number | null, "pitches_per_inning": number | null, "pitches_per_batter_faced": number | null, "one_two_three_innings": number | null, "leadoff_outs": number | null, "swing_miss_pct": number | null, "baa": number | null, "babip": number | null, "fip": number | null, "confidence": number }],
   "games": [{ "opponent_name": string | null, "game_date": string | null, "result": string | null, "runs_for": number | null, "runs_against": number | null, "notes": string | null, "confidence": number }],
   "warnings": string[],
   "unknowns": string[]

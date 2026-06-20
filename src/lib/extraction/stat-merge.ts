@@ -23,6 +23,7 @@ export const PITCHING_COUNTING_FIELDS = [
   "strikeouts",
   "hits_allowed",
   "runs_allowed",
+  "earned_runs",
   "one_two_three_innings",
   "leadoff_outs",
 ] as const;

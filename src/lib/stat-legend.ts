@@ -17,6 +17,9 @@ export const BATTING_STAT_TERMS: StatLegendTerm[] = [
 
 export const PITCHING_STAT_TERMS: StatLegendTerm[] = [
   { abbr: "IP", meaning: "Innings pitched" },
+  { abbr: "H", meaning: "Hits allowed" },
+  { abbr: "R", meaning: "Runs allowed" },
+  { abbr: "ER", meaning: "Earned runs allowed" },
   { abbr: "P", meaning: "Total pitches" },
   { abbr: "P-S", meaning: "Pitches–strikes" },
   { abbr: "BF", meaning: "Batters faced (from box score or estimated from IP + H + BB)" },

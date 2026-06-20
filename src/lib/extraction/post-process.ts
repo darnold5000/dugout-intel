@@ -92,7 +92,7 @@ const PITCHING_HEADERS: Record<string, keyof PitchingRow> = {
   K: "strikeouts",
   H: "hits_allowed",
   R: "runs_allowed",
-  ER: "runs_allowed",
+  ER: "earned_runs",
   BAA: "baa",
   "K/BB": "k_bb_ratio",
   KBB: "k_bb_ratio",
@@ -238,6 +238,7 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
       strikeouts: null,
       hits_allowed: null,
       runs_allowed: null,
+      earned_runs: null,
       k_bb_ratio: null,
       walks_per_inning: null,
       pitches_per_inning: null,
@@ -280,6 +281,7 @@ function mapTableToPitchingStats(table: RawExtractedTable): PitchingRow[] {
         case "strikeouts":
         case "hits_allowed":
         case "runs_allowed":
+        case "earned_runs":
         case "one_two_three_innings":
         case "leadoff_outs":
           stat[field] = parseInteger(raw) as never;
@@ -366,6 +368,7 @@ const PITCHING_MERGE_FIELDS: (keyof PitchingRow)[] = [
   "strikeouts",
   "hits_allowed",
   "runs_allowed",
+  "earned_runs",
   "k_bb_ratio",
   "walks_per_inning",
   "pitches_per_inning",

@@ -299,7 +299,24 @@ export function ScoutNotesTab({
     if (!res.ok) throw new Error("Failed to save note");
   };
 
-  const saveGameContext = async () => {
+  const shouldSaveGameContext = () => {
+    if (!showContext) return false;
+    return !!(
+      context.game_date ||
+      context.opponent_played ||
+      context.tournament_name ||
+      context.game_type !== "unknown" ||
+      context.leverage !== "medium" ||
+      context.inning_observed ||
+      context.notes ||
+      context.result ||
+      context.runs_for ||
+      context.runs_against
+    );
+  };
+
+  const saveGameContext = async (mainText?: string) => {
+    const noteParts = [context.notes.trim(), mainText?.trim()].filter(Boolean);
     const authHeaders = await getAuthHeaders();
     const res = await fetch(`/api/opponents/${opponentId}/game-context`, {
       method: "POST",
@@ -311,7 +328,7 @@ export function ScoutNotesTab({
         game_type: context.game_type,
         inning_observed: context.inning_observed || null,
         leverage: context.leverage,
-        notes: context.notes || composerText.trim() || null,
+        notes: noteParts.length ? noteParts.join("\n\n") : null,
         result: context.result || null,
         runs_for: context.runs_for ? Number(context.runs_for) : null,
         runs_against: context.runs_against ? Number(context.runs_against) : null,
@@ -374,39 +391,17 @@ export function ScoutNotesTab({
 
   const handleSubmit = async () => {
     const text = composerText.trim();
-    const hasContext =
-      showContext &&
-      (context.game_date ||
-        context.opponent_played ||
-        context.tournament_name ||
-        context.game_type !== "unknown" ||
-        context.leverage !== "medium" ||
-        context.inning_observed ||
-        context.notes ||
-        context.result ||
-        context.runs_for ||
-        context.runs_against);
+    const savingGameContext = shouldSaveGameContext();
 
-    if (!text && !attachedFiles.length && !hasContext) return;
+    if (!text && !attachedFiles.length && !savingGameContext) return;
 
     setSubmitting(true);
     setError("");
     try {
-      if (text) await saveNote(text);
-
-      if (
-        hasContext &&
-        (context.game_date ||
-          context.opponent_played ||
-          context.leverage !== "medium" ||
-          context.inning_observed ||
-          context.tournament_name ||
-          context.notes ||
-          context.result ||
-          context.runs_for ||
-          context.runs_against)
-      ) {
-        await saveGameContext();
+      if (savingGameContext) {
+        await saveGameContext(text || undefined);
+      } else if (text) {
+        await saveNote(text);
       }
 
       const images = attachedFiles.filter((f) => f.type.startsWith("image/"));
@@ -492,6 +487,15 @@ export function ScoutNotesTab({
   const deleteDocument = async (docId: string) => {
     const authHeaders = await getAuthHeaders();
     await fetch(`/api/opponents/${opponentId}/documents/${docId}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+    await onRefresh();
+  };
+
+  const deleteGameContext = async (contextId: string) => {
+    const authHeaders = await getAuthHeaders();
+    await fetch(`/api/opponents/${opponentId}/game-context/${contextId}`, {
       method: "DELETE",
       headers: authHeaders,
     });
@@ -652,6 +656,16 @@ export function ScoutNotesTab({
                 <Trash2 className="h-3 w-3" />
               </Button>
             )}
+            {item.kind === "game_context" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive"
+                onClick={() => deleteGameContext(item.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -759,7 +773,7 @@ export function ScoutNotesTab({
                 submitting ||
                 (!composerText.trim() &&
                   !attachedFiles.length &&
-                  !showContext)
+                  !shouldSaveGameContext())
               }
             >
               {submitting ? "Saving..." : "Save Scout Note"}
