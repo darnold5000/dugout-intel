@@ -51,6 +51,7 @@ import {
   FileText,
   Maximize2,
   Mic,
+  Info,
   Paperclip,
   Sparkles,
   Trash2,
@@ -77,6 +78,13 @@ const GAME_TYPES = [
   { value: "championship", label: "Championship" },
   { value: "friendly", label: "Friendly" },
   { value: "scrimmage", label: "Scrimmage" },
+];
+
+const PITCHER_ROLES = [
+  { value: "unknown", label: "Unknown" },
+  { value: "starter", label: "Starter" },
+  { value: "relief", label: "Relief" },
+  { value: "closer", label: "Closer" },
 ];
 
 const KIND_ICONS: Record<EvidenceKind, string> = {
@@ -144,6 +152,11 @@ export function ScoutNotesTab({
     result: "",
     runs_for: "",
     runs_against: "",
+    pitcher_jersey_number: "",
+    pitcher_name: "",
+    innings_pitched: "",
+    pitch_count: "",
+    pitcher_role: "unknown",
   });
   const [submitting, setSubmitting] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -313,8 +326,31 @@ export function ScoutNotesTab({
       context.notes ||
       context.result ||
       context.runs_for ||
-      context.runs_against
+      context.runs_against ||
+      context.pitcher_jersey_number ||
+      context.pitcher_name ||
+      context.innings_pitched ||
+      context.pitch_count ||
+      context.pitcher_role !== "unknown"
     );
+  };
+
+  const hasPitcherWorkload = () =>
+    !!(
+      (context.pitcher_jersey_number || context.pitcher_name) &&
+      context.game_date
+    );
+
+  const rebuildLedger = async () => {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`/api/opponents/${opponentId}/rebuild-stats`, {
+      method: "POST",
+      headers: authHeaders,
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || "Failed to refresh pitching ledger");
+    }
   };
 
   const saveGameContext = async (mainText?: string) => {
@@ -334,6 +370,13 @@ export function ScoutNotesTab({
         result: context.result || null,
         runs_for: context.runs_for ? Number(context.runs_for) : null,
         runs_against: context.runs_against ? Number(context.runs_against) : null,
+        pitcher_jersey_number: context.pitcher_jersey_number.trim() || null,
+        pitcher_name: context.pitcher_name.trim() || null,
+        innings_pitched: context.innings_pitched
+          ? Number(context.innings_pitched)
+          : null,
+        pitch_count: context.pitch_count ? Number(context.pitch_count) : null,
+        pitcher_role: context.pitcher_role,
         reason_pitcher_entered: "unknown",
       }),
     });
@@ -402,6 +445,9 @@ export function ScoutNotesTab({
     try {
       if (savingGameContext) {
         await saveGameContext(text || undefined);
+        if (hasPitcherWorkload()) {
+          await rebuildLedger();
+        }
       } else if (text) {
         await saveNote(text);
       }
@@ -425,6 +471,11 @@ export function ScoutNotesTab({
         result: "",
         runs_for: "",
         runs_against: "",
+        pitcher_jersey_number: "",
+        pitcher_name: "",
+        innings_pitched: "",
+        pitch_count: "",
+        pitcher_role: "unknown",
       });
       setShowContext(false);
       await onRefresh();
@@ -621,6 +672,25 @@ export function ScoutNotesTab({
                   Inning {item.gameContext.inning_observed}
                 </Badge>
               )}
+              {(item.gameContext.pitcher_jersey_number ||
+                item.gameContext.pitcher_name) && (
+                <Badge variant="outline" className="text-xs">
+                  {item.gameContext.pitcher_jersey_number
+                    ? `#${item.gameContext.pitcher_jersey_number}`
+                    : ""}
+                  {item.gameContext.pitcher_jersey_number &&
+                  item.gameContext.pitcher_name
+                    ? " "
+                    : ""}
+                  {item.gameContext.pitcher_name ?? ""}
+                  {item.gameContext.innings_pitched != null
+                    ? ` · ${item.gameContext.innings_pitched} IP`
+                    : ""}
+                  {item.gameContext.pitch_count != null
+                    ? ` · ${item.gameContext.pitch_count} pitches`
+                    : ""}
+                </Badge>
+              )}
             </div>
           )}
           <IncludedToggle
@@ -782,6 +852,20 @@ export function ScoutNotesTab({
             </Button>
           </div>
 
+          <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
+            <div className="flex gap-2">
+              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
+              <p>
+                <span className="font-medium text-foreground">
+                  Context powers your reports.
+                </span>{" "}
+                Game date, opponent, game type, and pitcher # + innings feed the
+                scouting report, Pitching Ledger, and tomorrow&apos;s availability
+                outlook — even without a box score screenshot.
+              </p>
+            </div>
+          </div>
+
           <button
             type="button"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -915,6 +999,84 @@ export function ScoutNotesTab({
                   }
                   placeholder="e.g. 4th"
                 />
+              </div>
+              <div className="sm:col-span-2 border-t pt-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Pitcher workload (no screenshot needed)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Pitcher #</Label>
+                    <Input
+                      value={context.pitcher_jersey_number}
+                      onChange={(e) =>
+                        setContext({
+                          ...context,
+                          pitcher_jersey_number: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. 6"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Pitcher name</Label>
+                    <Input
+                      value={context.pitcher_name}
+                      onChange={(e) =>
+                        setContext({ ...context, pitcher_name: e.target.value })
+                      }
+                      placeholder="e.g. Carson L (optional)"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Innings pitched</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={context.innings_pitched}
+                      onChange={(e) =>
+                        setContext({
+                          ...context,
+                          innings_pitched: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. 2.0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Pitch count</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={context.pitch_count}
+                      onChange={(e) =>
+                        setContext({ ...context, pitch_count: e.target.value })
+                      }
+                      placeholder="optional"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Role</Label>
+                    <select
+                      value={context.pitcher_role}
+                      onChange={(e) =>
+                        setContext({ ...context, pitcher_role: e.target.value })
+                      }
+                      className="w-full text-sm rounded-md border px-2 py-2 h-9"
+                    >
+                      {PITCHER_ROLES.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Game date + pitcher # (or name) updates the Pitching Ledger
+                  automatically.
+                </p>
               </div>
               <div className="sm:col-span-2">
                 <Label className="text-xs">Context Notes</Label>

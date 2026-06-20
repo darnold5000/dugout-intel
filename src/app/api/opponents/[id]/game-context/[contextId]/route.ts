@@ -29,6 +29,11 @@ export async function PUT(
     "result",
     "runs_for",
     "runs_against",
+    "pitcher_jersey_number",
+    "pitcher_name",
+    "innings_pitched",
+    "pitch_count",
+    "pitcher_role",
     "included_in_report",
   ];
   const updates: Record<string, unknown> = {};

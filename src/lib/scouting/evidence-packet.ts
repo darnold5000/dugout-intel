@@ -152,6 +152,11 @@ export function buildEvidencePacket(data: OpponentDetail): EvidencePacket {
       result: g.result ?? null,
       runs_for: g.runs_for ?? null,
       runs_against: g.runs_against ?? null,
+      pitcher_jersey_number: g.pitcher_jersey_number ?? null,
+      pitcher_name: g.pitcher_name ?? null,
+      innings_pitched: g.innings_pitched ?? null,
+      pitch_count: g.pitch_count ?? null,
+      pitcher_role: g.pitcher_role ?? "unknown",
       weight: getScoutNoteWeight("game_context", g.game_type),
     }));
 

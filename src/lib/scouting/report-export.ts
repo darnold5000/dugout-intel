@@ -100,7 +100,7 @@ function buildV2Body(data: ScoutingReportJson): string {
       "Pitching Staff Breakdown",
       proseHtml(data.pitching_staff_breakdown ?? data.pitching_notes)
     ),
-    sectionHtml("Pitcher Usage / Game Context", proseHtml(data.pitcher_usage_context)),
+    sectionHtml("Tournament Pitching Intelligence", proseHtml(data.pitcher_usage_context)),
     sectionHtml(
       "Offensive Threats",
       proseHtml(data.offensive_threats ?? data.offensive_tendencies)

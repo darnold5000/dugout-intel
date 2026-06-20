@@ -149,6 +149,12 @@ export interface OpponentVoiceNote {
   created_at: string;
 }
 
+export type PitcherAppearanceRole =
+  | "unknown"
+  | "starter"
+  | "relief"
+  | "closer";
+
 export interface OpponentGameContext {
   id: string;
   opponent_id: string;
@@ -165,6 +171,11 @@ export interface OpponentGameContext {
   result: string | null;
   runs_for: number | null;
   runs_against: number | null;
+  pitcher_jersey_number: string | null;
+  pitcher_name: string | null;
+  innings_pitched: number | null;
+  pitch_count: number | null;
+  pitcher_role: PitcherAppearanceRole | string;
   included_in_report: boolean;
   created_at: string;
   updated_at: string;

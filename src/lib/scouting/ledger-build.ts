@@ -117,19 +117,64 @@ function entriesFromUpload(
   });
 }
 
-function entriesFromGameContext(ctx: OpponentGameContext): LedgerEntryDraft[] {
-  if (!ctx.notes?.trim()) return [];
-  return extractPitchingFromRecap(ctx.notes, {
-    game_date: ctx.game_date,
-    opponent_played: ctx.opponent_played,
-    game_type: ctx.game_type,
-    tournament_name: ctx.tournament_name,
-    leverage: ctx.leverage,
-    entered_inning: ctx.inning_observed,
-    score_when_entered: ctx.score_when_pitcher_entered,
-    source_reference: ctx.id,
+function structuredEntryFromGameContext(
+  ctx: OpponentGameContext
+): LedgerEntryDraft | null {
+  const jersey = ctx.pitcher_jersey_number?.trim() || null;
+  const name = ctx.pitcher_name?.trim() || null;
+  if (!jersey && !name) return null;
+  if (!ctx.game_date?.slice(0, 10)) return null;
+
+  const role = ctx.pitcher_role ?? "unknown";
+  const started = role === "starter";
+  const relief = role === "relief" || role === "closer";
+
+  return {
+    player_name: name,
+    jersey_number: jersey,
+    game_date: ctx.game_date.slice(0, 10),
+    opponent_played: ctx.opponent_played ?? null,
+    game_type: ctx.game_type ?? "unknown",
+    tournament_name: ctx.tournament_name ?? null,
+    innings_pitched:
+      ctx.innings_pitched != null ? Number(ctx.innings_pitched) : null,
+    pitch_count: ctx.pitch_count != null ? Number(ctx.pitch_count) : null,
+    batters_faced: null,
+    strikeouts: null,
+    walks: null,
+    hits_allowed: null,
+    started_game: started ? true : relief ? false : null,
+    finished_game: role === "closer" ? true : null,
+    entered_inning: ctx.inning_observed ?? null,
+    score_when_entered: ctx.score_when_pitcher_entered ?? null,
+    leverage: ctx.leverage ?? "medium",
     source_type: "game_context",
-  });
+    source_reference: ctx.id,
+  };
+}
+
+function entriesFromGameContext(ctx: OpponentGameContext): LedgerEntryDraft[] {
+  const drafts: LedgerEntryDraft[] = [];
+  const structured = structuredEntryFromGameContext(ctx);
+  if (structured) drafts.push(structured);
+
+  if (ctx.notes?.trim()) {
+    for (const draft of extractPitchingFromRecap(ctx.notes, {
+      game_date: ctx.game_date,
+      opponent_played: ctx.opponent_played,
+      game_type: ctx.game_type,
+      tournament_name: ctx.tournament_name,
+      leverage: ctx.leverage,
+      entered_inning: ctx.inning_observed,
+      score_when_entered: ctx.score_when_pitcher_entered,
+      source_reference: ctx.id,
+      source_type: "game_context",
+    })) {
+      drafts.push(draft);
+    }
+  }
+
+  return drafts;
 }
 
 function entriesFromNote(note: OpponentNote): LedgerEntryDraft[] {

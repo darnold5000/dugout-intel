@@ -28,6 +28,18 @@ export async function POST(
 
   const body = await request.json();
 
+  const parseInnings = (value: unknown): number | null => {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const parsePitchCount = (value: unknown): number | null => {
+    if (value == null || value === "") return null;
+    const n = Number.parseInt(String(value), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const { data, error } = await supabase
     .from("opponent_game_context")
     .insert({
@@ -51,6 +63,11 @@ export async function POST(
         body.runs_against != null && body.runs_against !== ""
           ? Number(body.runs_against)
           : null,
+      pitcher_jersey_number: body.pitcher_jersey_number?.trim() || null,
+      pitcher_name: body.pitcher_name?.trim() || null,
+      innings_pitched: parseInnings(body.innings_pitched),
+      pitch_count: parsePitchCount(body.pitch_count),
+      pitcher_role: body.pitcher_role ?? "unknown",
       included_in_report: body.included_in_report ?? true,
     })
     .select()
