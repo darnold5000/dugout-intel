@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
 import { GameDayCard } from "@/components/opponent/GameDayCard";
+import { ReportExportActions } from "@/components/ReportExportActions";
 import { reportNeedsRefresh } from "@/lib/scouting/opponent-dashboard";
 import { getAuthHeaders } from "@/lib/auth-headers";
 import { formatDate } from "@/lib/utils";
@@ -27,7 +28,6 @@ import {
   Trash2,
   Share2,
   Mail,
-  Download,
   Maximize2,
   Check,
   RefreshCw,
@@ -164,18 +164,6 @@ export function ReportsTab({
     window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
   };
 
-  const handleDownload = (report: ScoutingReport) => {
-    const blob = new Blob([report.report_text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(report.title ?? "scouting-report").replace(/\s+/g, "-").toLowerCase()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handlePrint = () => window.print();
-
   return (
     <div className="space-y-6">
       {stale && (
@@ -257,19 +245,11 @@ export function ReportsTab({
               variant="outline"
             />
             {displayReport && (
-              <>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => handleDownload(displayReport)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                <Button variant="outline" size="lg" onClick={handlePrint}>
-                  Print / PDF
-                </Button>
-              </>
+              <ReportExportActions
+                report={displayReport}
+                opponentName={opponentName}
+                size="lg"
+              />
             )}
           </div>
         </CardContent>
@@ -310,7 +290,10 @@ export function ReportsTab({
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ScoutingReportViewer report={displayReport} />
+            <ScoutingReportViewer
+              report={displayReport}
+              opponentName={opponentName}
+            />
             <div className="flex flex-wrap gap-2 no-print">
               <Button
                 variant="outline"
@@ -396,18 +379,6 @@ export function ReportsTab({
                           className="h-8 w-8"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDownload(report);
-                          }}
-                          title="Download"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
                             handleShare(report);
                           }}
                           title="Share link"
@@ -447,7 +418,10 @@ export function ReportsTab({
             </DialogTitle>
           </DialogHeader>
           {fullScreenReport && (
-            <ScoutingReportViewer report={fullScreenReport} />
+            <ScoutingReportViewer
+              report={fullScreenReport}
+              opponentName={opponentName}
+            />
           )}
         </DialogContent>
       </Dialog>

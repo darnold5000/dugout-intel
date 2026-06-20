@@ -4,11 +4,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Printer } from "lucide-react";
+import { Copy, Check } from "lucide-react";
+import { ReportExportActions } from "@/components/ReportExportActions";
 import type { ScoutingReport, ScoutingReportJson } from "@/types";
 
 interface ScoutingReportViewerProps {
   report: ScoutingReport;
+  opponentName?: string;
 }
 
 function LeaderList({
@@ -79,7 +81,10 @@ function ReportSection({
   );
 }
 
-export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
+export function ScoutingReportViewer({
+  report,
+  opponentName,
+}: ScoutingReportViewerProps) {
   const [copied, setCopied] = useState(false);
   const data = report.report_json as ScoutingReportJson;
   const isV2 = Boolean(data.executive_summary || data.pitching_staff_breakdown);
@@ -90,21 +95,20 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePrint = () => window.print();
+  const exportActions = (
+    <div className="flex flex-wrap gap-2 no-print">
+      <Button variant="outline" size="sm" onClick={handleCopy}>
+        {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+        {copied ? "Copied!" : "Copy report"}
+      </Button>
+      <ReportExportActions report={report} opponentName={opponentName} />
+    </div>
+  );
 
   if (isV2) {
     return (
       <div className="space-y-6">
-        <div className="flex gap-2 no-print">
-          <Button variant="outline" size="sm" onClick={handleCopy}>
-            {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-            {copied ? "Copied!" : "Copy report"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-1" />
-            Print
-          </Button>
-        </div>
+        {exportActions}
 
         <ReportSection title="Executive Summary" content={data.executive_summary ?? data.opponent_summary} />
         <ReportSection title="Key Players To Know" list={data.key_players ?? data.players_to_watch} />
@@ -124,18 +128,7 @@ export function ScoutingReportViewer({ report }: ScoutingReportViewerProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 no-print">
-        <Button variant="outline" size="sm" onClick={handleCopy}>
-          {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-          {copied ? "Copied!" : "Copy report"}
-        </Button>
-        <Button variant="outline" size="sm" onClick={handlePrint}>
-          <Printer className="h-4 w-4 mr-1" />
-          Print
-        </Button>
-      </div>
-
-
+      {exportActions}
       <Card>
         <CardHeader>
           <CardTitle>Opponent Summary</CardTitle>
