@@ -27,10 +27,16 @@ export function OpponentDashboardHero({ data }: OpponentDashboardHeroProps) {
           <h2 className="text-lg font-bold tracking-tight uppercase">
             {data.name}
           </h2>
-          <Badge variant={threatVariant as "default" | "secondary" | "destructive"}>
+          <Badge
+            variant={threatVariant as "default" | "secondary" | "destructive"}
+            title={summary.overallThreatReason}
+          >
             Overall Threat: {summary.overallThreat}
           </Badge>
         </div>
+        <p className="text-xs text-muted-foreground mb-4 -mt-2">
+          {summary.overallThreatReason}
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">Primary Pitcher</p>
