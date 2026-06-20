@@ -24,3 +24,10 @@ export function formatPercent(value: number | null): string {
   const pct = value <= 1 ? value * 100 : value;
   return `${pct.toFixed(1)}%`;
 }
+
+/** Normalize S%, FPS%, etc. stored as either 0.62 or 62 into decimal 0–1. */
+export function normalizePctDecimal(value: number | null | undefined): number | null {
+  if (value == null) return null;
+  if (value > 1) return value / 100;
+  return value;
+}

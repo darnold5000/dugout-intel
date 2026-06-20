@@ -5,6 +5,10 @@ import {
   resolveConsolidationKey,
 } from "@/lib/extraction/player-identity";
 import { enrichPitchingStatForDisplay } from "@/lib/scouting/pitching-derived";
+import {
+  mergeBattingRowsAccumulating,
+  mergePitchingRowsAccumulating,
+} from "@/lib/extraction/stat-merge";
 import type {
   ExtractedBattingStat,
   ExtractedPitchingStat,
@@ -263,19 +267,37 @@ export function collectDataGaps(
   return gaps;
 }
 
-function statRichness(row: object): number {
-  return Object.values(row).filter((v) => v != null && v !== "").length;
+
+function hasNewUploadSource(
+  existing: ExtractedBattingStat | ExtractedPitchingStat,
+  incoming: ExtractedBattingStat | ExtractedPitchingStat
+): boolean {
+  const existingIds = new Set(
+    uniqueUploadIds([
+      ...(existing.source_upload_ids ?? []),
+      existing.source_upload_id ?? "",
+    ])
+  );
+  const incomingIds = uniqueUploadIds([
+    ...(incoming.source_upload_ids ?? []),
+    incoming.source_upload_id ?? "",
+  ]);
+  return incomingIds.some((id) => !existingIds.has(id));
 }
 
 function mergeBattingStat(
   existing: ExtractedBattingStat,
   incoming: ExtractedBattingStat
 ): ExtractedBattingStat {
-  const pick = statRichness(incoming) >= statRichness(existing) ? incoming : existing;
-  const other = pick === incoming ? existing : incoming;
+  const merged = mergeBattingRowsAccumulating(
+    existing,
+    incoming,
+    hasNewUploadSource(existing, incoming)
+  );
+
   return {
-    ...other,
-    ...pick,
+    ...existing,
+    ...merged,
     source_upload_ids: uniqueUploadIds([
       ...(existing.source_upload_ids ?? []),
       ...(incoming.source_upload_ids ?? []),
@@ -283,8 +305,9 @@ function mergeBattingStat(
       incoming.source_upload_id ?? "",
     ]),
     confidence: maxConfidence(existing.confidence, incoming.confidence),
-    player_name: pick.player_name ?? other.player_name,
-    jersey_number: pick.jersey_number ?? other.jersey_number,
+    player_name: merged.player_name ?? existing.player_name ?? incoming.player_name,
+    jersey_number:
+      merged.jersey_number ?? existing.jersey_number ?? incoming.jersey_number,
   };
 }
 
@@ -292,11 +315,15 @@ function mergePitchingStat(
   existing: ExtractedPitchingStat,
   incoming: ExtractedPitchingStat
 ): ExtractedPitchingStat {
-  const pick = statRichness(incoming) >= statRichness(existing) ? incoming : existing;
-  const other = pick === incoming ? existing : incoming;
+  const merged = mergePitchingRowsAccumulating(
+    existing,
+    incoming,
+    hasNewUploadSource(existing, incoming)
+  );
+
   return {
-    ...other,
-    ...pick,
+    ...existing,
+    ...merged,
     source_upload_ids: uniqueUploadIds([
       ...(existing.source_upload_ids ?? []),
       ...(incoming.source_upload_ids ?? []),
@@ -304,8 +331,9 @@ function mergePitchingStat(
       incoming.source_upload_id ?? "",
     ]),
     confidence: maxConfidence(existing.confidence, incoming.confidence),
-    player_name: pick.player_name ?? other.player_name,
-    jersey_number: pick.jersey_number ?? other.jersey_number,
+    player_name: merged.player_name ?? existing.player_name ?? incoming.player_name,
+    jersey_number:
+      merged.jersey_number ?? existing.jersey_number ?? incoming.jersey_number,
   };
 }
 

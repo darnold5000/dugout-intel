@@ -1,4 +1,5 @@
 import { parseBaseballInnings, formatBaseballInnings } from "@/lib/scouting/innings";
+import { formatPercent, normalizePctDecimal } from "@/lib/utils";
 import {
   formatPlayerDisplayLabel,
   getConsolidatedPitchingStats,
@@ -65,13 +66,32 @@ function computeWhip(stat: ExtractedPitchingStat): number | null {
   return (bb + h) / ip;
 }
 
-function deriveStrikesBalls(
-  pitches: number | null,
-  strikePct: number | null
-): { strikes: number | null; balls: number | null } {
-  if (pitches == null || strikePct == null) return { strikes: null, balls: null };
-  const strikes = Math.round(pitches * strikePct);
+function pitchCount(stat: ExtractedPitchingStat): number | null {
+  return stat.total_pitches ?? stat.pitches;
+}
+
+function resolveStrikesBalls(stat: ExtractedPitchingStat): {
+  strikes: number | null;
+  balls: number | null;
+} {
+  const pitches = pitchCount(stat);
+  if (stat.strikes != null && pitches != null) {
+    return { strikes: stat.strikes, balls: pitches - stat.strikes };
+  }
+  if (pitches == null || stat.strike_percentage == null) {
+    return { strikes: null, balls: null };
+  }
+  const pct = normalizePctDecimal(stat.strike_percentage);
+  if (pct == null) return { strikes: null, balls: null };
+  const strikes = Math.round(pitches * pct);
   return { strikes, balls: pitches - strikes };
+}
+
+function strikePctDecimal(stat: ExtractedPitchingStat): number | null {
+  if (stat.strikes != null && pitchCount(stat) != null && pitchCount(stat)! > 0) {
+    return stat.strikes / pitchCount(stat)!;
+  }
+  return normalizePctDecimal(stat.strike_percentage);
 }
 
 function isBracketContext(gameType: string | null | undefined): boolean {
@@ -118,23 +138,24 @@ export function analyzePitchingStaff(
       s.innings_pitched != null ? parseBaseballInnings(s.innings_pitched) : 0
     )
   );
-  const maxPitches = Math.max(...pitchingStats.map((s) => s.pitches ?? 0));
+  const maxPitches = Math.max(
+    ...pitchingStats.map((s) => pitchCount(s) ?? 0)
+  );
 
   const highLeverageContexts = gameContexts.filter(
     (c) => c.leverage === "high" || isBracketContext(c.game_type)
   );
 
   return pitchingStats
-    .filter((s) => s.innings_pitched != null || s.pitches != null)
+    .filter((s) => s.innings_pitched != null || pitchCount(s) != null)
     .map((stat) => {
       const ip =
         stat.innings_pitched != null
           ? parseBaseballInnings(stat.innings_pitched)
           : null;
-      const { strikes, balls } = deriveStrikesBalls(
-        stat.pitches,
-        stat.strike_percentage
-      );
+      const pitches = pitchCount(stat);
+      const { strikes, balls } = resolveStrikesBalls(stat);
+      const strikePct = strikePctDecimal(stat);
       const whip = computeWhip(stat);
       const evidence: string[] = [];
       const roleLabels: PitcherRoleLabel[] = [];
@@ -148,18 +169,19 @@ export function analyzePitchingStaff(
         }
       }
 
-      if (stat.pitches != null && stat.pitches >= maxPitches * 0.9 && maxPitches > 0) {
+      if (pitches != null && pitches >= maxPitches * 0.9 && maxPitches > 0) {
         score += 2;
-        evidence.push(`Highest pitch count (${stat.pitches} pitches)`);
+        evidence.push(`Highest pitch count (${pitches} pitches)`);
       }
 
-      if (stat.strike_percentage != null) {
-        const pct = (stat.strike_percentage * 100).toFixed(1);
-        evidence.push(`${strikes ?? "?"} strikes / ${balls ?? "?"} balls (${pct}% strikes)`);
-        if (stat.strike_percentage >= 0.62) {
+      if (strikePct != null) {
+        evidence.push(
+          `${strikes ?? "?"} strikes / ${balls ?? "?"} balls (${formatPercent(stat.strike_percentage ?? strikePct)})`
+        );
+        if (strikePct >= 0.62) {
           roleLabels.push("Strike Thrower");
           score += 1;
-        } else if (stat.strike_percentage < 0.5) {
+        } else if (strikePct < 0.5) {
           score -= 1;
         }
       }
@@ -221,8 +243,8 @@ export function analyzePitchingStaff(
       else if (score >= 3) roleLabels.push("High-Leverage Arm");
       else if (ip != null && ip < 1) roleLabels.push("Emergency / Depth Arm");
       else if (
-        stat.strike_percentage != null &&
-        stat.strike_percentage < 0.5 &&
+        strikePct != null &&
+        strikePct < 0.5 &&
         stat.era != null &&
         stat.era < 4
       ) {
@@ -263,8 +285,7 @@ export function analyzePitchingStaff(
           "Our approach: treat as depth unless bracket notes indicate higher leverage usage.";
       }
 
-      const strikeThrower =
-        stat.strike_percentage != null && stat.strike_percentage >= 0.62;
+      const strikeThrower = strikePct != null && strikePct >= 0.62;
       const walksPerInning =
         ip != null && ip > 0 && stat.walks != null ? stat.walks / ip : null;
       let controlRisk: "Low" | "Medium" | "High" = "Medium";
@@ -275,7 +296,7 @@ export function analyzePitchingStaff(
 
       let workload: "Heavy" | "Medium" | "Light" | "Unknown" = "Unknown";
       if (ip != null) {
-        if (ip >= 4 || (stat.pitches ?? 0) >= maxPitches * 0.85) workload = "Heavy";
+        if (ip >= 4 || (pitches ?? 0) >= maxPitches * 0.85) workload = "Heavy";
         else if (ip >= 2) workload = "Medium";
         else workload = "Light";
       }
@@ -302,8 +323,8 @@ export function analyzePitchingStaff(
         likelyUsage = "Spot / depth usage";
       }
 
-      if (stat.pitches != null && ip != null && ip > 0) {
-        const ppi = stat.pitches / ip;
+      if (pitches != null && ip != null && ip > 0) {
+        const ppi = pitches / ip;
         if (ppi >= 20) {
           evidence.push(`High workload: ${ppi.toFixed(0)} pitches per inning`);
         } else if (ppi <= 12) {
@@ -311,7 +332,7 @@ export function analyzePitchingStaff(
         }
       }
 
-      if (stat.strike_percentage != null && stat.strike_percentage < 0.5) {
+      if (strikePct != null && strikePct < 0.5) {
         evidence.push("Wild pitcher — sub-50% strike rate");
       }
 
@@ -328,17 +349,17 @@ export function analyzePitchingStaff(
         likelyUsage,
         inningsPitched: ip,
         inningsPitchedDisplay: ip != null ? formatBaseballInnings(ip) : null,
-        pitches: stat.pitches,
+        pitches,
         strikes,
         balls,
-        strikePercentage: stat.strike_percentage,
+        strikePercentage: strikePct,
         walks: stat.walks,
         strikeouts: stat.strikeouts,
         hitsAllowed: stat.hits_allowed,
         era: stat.era,
         whip,
         pitchesPerInning:
-          ip != null && ip > 0 && stat.pitches != null ? stat.pitches / ip : null,
+          ip != null && ip > 0 && pitches != null ? pitches / ip : null,
         walksPerInning:
           ip != null && ip > 0 && stat.walks != null ? stat.walks / ip : null,
         strikeoutsPerInning:
@@ -375,7 +396,7 @@ export function formatPitchingStaffRead(analyses: PitcherAnalysis[]): string {
           ? `- ${p.strikes} strikes / ${p.balls} balls`
           : null,
         p.strikePercentage != null
-          ? `- ${(p.strikePercentage * 100).toFixed(1)}% strikes`
+          ? `- ${formatPercent(p.strikePercentage)} strikes`
           : null,
         p.inningsPitchedDisplay ? `- ${p.inningsPitchedDisplay} IP` : null,
         "",

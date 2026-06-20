@@ -6,6 +6,11 @@ import {
   resolveConsolidationKey,
 } from "@/lib/extraction/player-identity";
 import { enrichExtractionResult } from "@/lib/extraction/post-process";
+import {
+  mergeBattingRowsAccumulating,
+  mergePitchingRowsAccumulating,
+  recalculatePitchingRates,
+} from "@/lib/extraction/stat-merge";
 
 type BattingRow = AIExtractionResult["batting_stats"][number];
 type PitchingRow = AIExtractionResult["pitching_stats"][number];
@@ -210,47 +215,29 @@ export function mergeBattingStatRows(
       continue;
     }
 
+    const isNewUpload = !existing.source_upload_ids.has(uploadId);
     existing.source_upload_ids.add(uploadId);
     if (identity.jersey_number && !existing.identity.jersey_number) {
       existing.identity.jersey_number = identity.jersey_number;
       existing.row.jersey_number = identity.jersey_number;
     }
 
-    const playerLabel =
-      identity.player_name ?? identity.merge_key ?? "unknown player";
-
+    existing.row = mergeBattingRowsAccumulating(
+      existing.row,
+      {
+        ...row,
+        player_name: identity.player_name,
+        jersey_number: identity.jersey_number,
+      },
+      isNewUpload
+    );
+    existing.row.confidence = Math.max(existing.row.confidence, row.confidence);
     for (const field of BATTING_FIELDS) {
-      const incomingValue = row[field];
-      if (incomingValue == null) continue;
-
-      const currentValue = existing.row[field];
-      const currentMeta = existing.fieldMeta[field] ?? {
-        confidence: existing.row.confidence,
-        order: -1,
-      };
-
-      if (currentValue == null) {
-        existing.row[field] = incomingValue;
-        existing.fieldMeta[field] = meta;
-        continue;
-      }
-
-      if (valuesEqual(currentValue, incomingValue)) continue;
-
-      const merged = mergeField(
-        field,
-        playerLabel,
-        { value: currentValue, meta: currentMeta },
-        { value: incomingValue, meta },
-        warnings
-      );
-      existing.row[field] = merged as never;
-      if (valuesEqual(merged, incomingValue)) {
+      if (row[field] != null) {
         existing.fieldMeta[field] = meta;
       }
     }
-
-    existing.row.confidence = Math.max(existing.row.confidence, row.confidence);
+    continue;
   }
 
   return Array.from(byKey.values()).map(({ identity, row, source_upload_ids }) => ({
@@ -303,50 +290,32 @@ export function mergePitchingStatRows(
       continue;
     }
 
+    const isNewUpload = !existing.source_upload_ids.has(uploadId);
     existing.source_upload_ids.add(uploadId);
     if (identity.jersey_number && !existing.identity.jersey_number) {
       existing.identity.jersey_number = identity.jersey_number;
       existing.row.jersey_number = identity.jersey_number;
     }
 
-    const playerLabel =
-      identity.player_name ?? identity.merge_key ?? "unknown player";
-
+    existing.row = mergePitchingRowsAccumulating(
+      existing.row,
+      {
+        ...row,
+        player_name: identity.player_name,
+        jersey_number: identity.jersey_number,
+      },
+      isNewUpload
+    );
+    existing.row.confidence = Math.max(existing.row.confidence, row.confidence);
     for (const field of PITCHING_FIELDS) {
-      const incomingValue = row[field];
-      if (incomingValue == null) continue;
-
-      const currentValue = existing.row[field];
-      const currentMeta = existing.fieldMeta[field] ?? {
-        confidence: existing.row.confidence,
-        order: -1,
-      };
-
-      if (currentValue == null) {
-        existing.row[field] = incomingValue;
-        existing.fieldMeta[field] = meta;
-        continue;
-      }
-
-      if (valuesEqual(currentValue, incomingValue)) continue;
-
-      const merged = mergeField(
-        field,
-        playerLabel,
-        { value: currentValue, meta: currentMeta },
-        { value: incomingValue, meta },
-        warnings
-      );
-      existing.row[field] = merged as never;
-      if (valuesEqual(merged, incomingValue)) {
+      if (row[field] != null) {
         existing.fieldMeta[field] = meta;
       }
     }
-
-    existing.row.confidence = Math.max(existing.row.confidence, row.confidence);
   }
 
   return Array.from(byKey.values()).map(({ identity, row, source_upload_ids }) => {
+    recalculatePitchingRates(row);
     if (row.total_pitches != null) row.pitches = row.total_pitches;
     else if (row.pitches != null) row.total_pitches = row.pitches;
     return {
@@ -395,6 +364,7 @@ export function mergePlayerRows(
       continue;
     }
 
+    const isNewUpload = !existing.source_upload_ids.has(uploadId);
     existing.source_upload_ids.add(uploadId);
     if (identity.jersey_number && !existing.identity.jersey_number) {
       existing.identity.jersey_number = identity.jersey_number;
@@ -452,6 +422,7 @@ export function mergeGameRows(
       continue;
     }
 
+    const isNewUpload = !existing.source_upload_ids.has(uploadId);
     existing.source_upload_ids.add(uploadId);
     const meta: FieldMeta = { confidence: row.confidence, order };
     const currentMeta: FieldMeta = {

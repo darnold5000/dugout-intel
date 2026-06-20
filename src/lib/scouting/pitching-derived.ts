@@ -1,4 +1,5 @@
 import { parseBaseballInnings } from "@/lib/scouting/innings";
+import { normalizePctDecimal } from "@/lib/utils";
 import type { ExtractedPitchingStat } from "@/types";
 
 type PitchingLike = Pick<
@@ -60,11 +61,10 @@ export function enrichPitchingStatForDisplay<T extends PitchingLike>(stat: T): T
     next.total_pitches != null &&
     next.strike_percentage != null
   ) {
-    const pct =
-      next.strike_percentage > 1
-        ? next.strike_percentage / 100
-        : next.strike_percentage;
-    next = { ...next, strikes: Math.round(next.total_pitches * pct) };
+    const pct = normalizePctDecimal(next.strike_percentage);
+    if (pct != null) {
+      next = { ...next, strikes: Math.round(next.total_pitches * pct) };
+    }
   }
 
   return next;

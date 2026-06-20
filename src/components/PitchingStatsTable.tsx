@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { deriveBattersFaced, enrichPitchingStatForDisplay } from "@/lib/scouting/pitching-derived";
 import { StatsLegend } from "@/components/StatsLegend";
-import { formatPercent, formatStat } from "@/lib/utils";
+import { formatPercent, formatStat, normalizePctDecimal } from "@/lib/utils";
 import { PITCHING_STAT_TERMS, pickLegendTerms } from "@/lib/stat-legend";
 import type { ExtractedPitchingStat } from "@/types";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -40,10 +40,13 @@ function pitchStrikesLine(stat: ExtractedPitchingStat): string | null {
 }
 
 function derivedStrikePct(stat: ExtractedPitchingStat): number | null {
-  if (stat.strike_percentage != null) return stat.strike_percentage;
   const pitches = pitchCount(stat);
-  if (pitches == null || stat.strikes == null || pitches <= 0) return null;
-  return (stat.strikes / pitches) * 100;
+  if (stat.strikes != null && pitches != null && pitches > 0) {
+    return (stat.strikes / pitches) * 100;
+  }
+  const pct = normalizePctDecimal(stat.strike_percentage);
+  if (pct == null) return null;
+  return pct * 100;
 }
 
 function derivedBalls(stat: ExtractedPitchingStat): number | null {
