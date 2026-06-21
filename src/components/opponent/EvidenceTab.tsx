@@ -270,6 +270,17 @@ export function ScoutNotesTab({
     const authHeaders = await getAuthHeaders();
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
+    if (context.game_date) formData.append("game_date", context.game_date);
+    if (context.opponent_played) {
+      formData.append("opponent_played", context.opponent_played);
+    }
+    if (context.tournament_name) {
+      formData.append("tournament_name", context.tournament_name);
+    }
+    if (context.game_type !== "unknown") {
+      formData.append("game_type", context.game_type);
+    }
+    formData.append("screenshot_type", "box_score");
     const res = await fetch(`/api/opponents/${opponentId}/upload`, {
       method: "POST",
       headers: authHeaders,
@@ -496,6 +507,14 @@ export function ScoutNotesTab({
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
+    const gameMetaTouched =
+      "game_date" in updates ||
+      "opponent_played" in updates ||
+      "tournament_name" in updates ||
+      "game_type" in updates;
+    if (gameMetaTouched) {
+      await rebuildLedger();
+    }
     await onRefresh();
   };
 
@@ -1282,6 +1301,7 @@ export function ScoutNotesTab({
         onOpenChange={(open) => !open && setDetailUpload(null)}
         onRerun={(id) => runExtraction([id])}
         onDelete={setDeleteTarget}
+        onUpdate={updateScreenshot}
         extracting={extracting}
       />
 

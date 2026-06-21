@@ -13,6 +13,7 @@ interface RebuildStatsButtonProps {
   className?: string;
   showDiagnostics?: boolean;
   onDiagnostics?: (message: string) => void;
+  label?: string;
 }
 
 export function RebuildStatsButton({
@@ -23,6 +24,7 @@ export function RebuildStatsButton({
   className,
   showDiagnostics = false,
   onDiagnostics,
+  label = "Rebuild Stats From Screenshots",
 }: RebuildStatsButtonProps) {
   const [rebuilding, setRebuilding] = useState(false);
   const [message, setMessage] = useState("");
@@ -74,7 +76,7 @@ export function RebuildStatsButton({
         disabled={rebuilding}
       >
         <RefreshCw className={`h-4 w-4 mr-2 ${rebuilding ? "animate-spin" : ""}`} />
-        Rebuild Stats From Screenshots
+        {rebuilding ? "Refreshing..." : label}
       </Button>
       {message && (
         <p className="text-xs text-muted-foreground mt-2">{message}</p>

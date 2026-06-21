@@ -78,14 +78,62 @@ function classifyScreenshotSource(type: string | null): LedgerSourceType {
   return "screenshot";
 }
 
+function resolveUploadGameMeta(
+  upload: ScreenshotUpload,
+  contexts: OpponentGameContext[]
+): {
+  game_date: string | null;
+  opponent_played: string | null;
+  game_type: string;
+  tournament_name: string | null;
+} {
+  const fromUpload = {
+    game_date: upload.game_date?.slice(0, 10) ?? null,
+    opponent_played: upload.opponent_played ?? null,
+    game_type: upload.game_type ?? "unknown",
+    tournament_name: upload.tournament_name ?? null,
+  };
+  if (fromUpload.game_date) return fromUpload;
+
+  const uploadMs = new Date(upload.created_at).getTime();
+  const candidates = contexts
+    .filter((c) => c.game_date?.slice(0, 10))
+    .map((c) => ({
+      ctx: c,
+      delta: Math.abs(new Date(c.created_at).getTime() - uploadMs),
+    }))
+    .sort((a, b) => a.delta - b.delta);
+
+  const best = candidates[0];
+  if (!best) return fromUpload;
+
+  if (candidates.length === 1 || best.delta < 2 * 60 * 60 * 1000) {
+    return {
+      game_date: best.ctx.game_date!.slice(0, 10),
+      opponent_played:
+        fromUpload.opponent_played ?? best.ctx.opponent_played ?? null,
+      game_type:
+        fromUpload.game_type !== "unknown"
+          ? fromUpload.game_type
+          : (best.ctx.game_type ?? "unknown"),
+      tournament_name:
+        fromUpload.tournament_name ?? best.ctx.tournament_name ?? null,
+    };
+  }
+
+  return fromUpload;
+}
+
 function entriesFromUpload(
   upload: ScreenshotUpload,
-  extraction: AIExtractionResult
+  extraction: AIExtractionResult,
+  contexts: OpponentGameContext[]
 ): LedgerEntryDraft[] {
-  const gameDate = upload.game_date?.slice(0, 10) ?? null;
-  const opponentPlayed = upload.opponent_played ?? null;
-  const gameType = upload.game_type ?? "unknown";
-  const tournamentName = upload.tournament_name ?? null;
+  const meta = resolveUploadGameMeta(upload, contexts);
+  const gameDate = meta.game_date;
+  const opponentPlayed = meta.opponent_played;
+  const gameType = meta.game_type ?? "unknown";
+  const tournamentName = meta.tournament_name;
   const sourceType = classifyScreenshotSource(upload.screenshot_type);
 
   if (!extraction.pitching_stats.length) return [];
@@ -220,6 +268,7 @@ function entriesFromDocument(
 
 export function buildLedgerDrafts(data: OpponentDetail): LedgerEntryDraft[] {
   const byKey = new Map<string, LedgerEntryDraft>();
+  const contexts = data.opponent_game_context ?? [];
 
   const add = (draft: LedgerEntryDraft) => {
     const key = ledgerAppearanceKey(draft);
@@ -234,12 +283,12 @@ export function buildLedgerDrafts(data: OpponentDetail): LedgerEntryDraft[] {
       upload.raw_extracted_table,
       upload.screenshot_type
     );
-    for (const draft of entriesFromUpload(upload, extraction)) {
+    for (const draft of entriesFromUpload(upload, extraction, contexts)) {
       add(draft);
     }
   }
 
-  for (const ctx of data.opponent_game_context ?? []) {
+  for (const ctx of contexts) {
     for (const draft of entriesFromGameContext(ctx)) add(draft);
   }
 

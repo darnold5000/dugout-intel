@@ -95,7 +95,9 @@ export async function DELETE(
   }
 
   try {
-    await rebuildOpponentStats(supabase, opponentId);
+    await rebuildOpponentStats(supabase, opponentId, undefined, {
+      userId: user.id,
+    });
   } catch {
     // non-fatal
   }

@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +16,7 @@ import { ExtractionStatusBadge } from "@/components/ExtractionStatusBadge";
 import { RawExtractedTableViewer } from "@/components/RawExtractedTableViewer";
 import { formatDate } from "@/lib/utils";
 import type { ScreenshotUpload } from "@/types";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { RefreshCw, Save, Trash2 } from "lucide-react";
 
 interface ScreenshotDetailModalProps {
   upload: ScreenshotUpload | null;
@@ -21,6 +24,10 @@ interface ScreenshotDetailModalProps {
   onOpenChange: (open: boolean) => void;
   onRerun: (uploadId: string) => void;
   onDelete: (upload: ScreenshotUpload) => void;
+  onUpdate?: (
+    uploadId: string,
+    updates: Record<string, unknown>
+  ) => Promise<void>;
   extracting?: boolean;
 }
 
@@ -30,11 +37,36 @@ export function ScreenshotDetailModal({
   onOpenChange,
   onRerun,
   onDelete,
+  onUpdate,
   extracting = false,
 }: ScreenshotDetailModalProps) {
+  const [gameDate, setGameDate] = useState("");
+  const [opponentPlayed, setOpponentPlayed] = useState("");
+  const [savingMeta, setSavingMeta] = useState(false);
+
+  useEffect(() => {
+    if (!upload) return;
+    setGameDate(upload.game_date?.slice(0, 10) ?? "");
+    setOpponentPlayed(upload.opponent_played ?? "");
+  }, [upload]);
+
   if (!upload) return null;
 
   const warningCount = upload.extraction_warnings?.length ?? 0;
+  const needsGameTags = !upload.game_date;
+
+  const saveGameTags = async () => {
+    if (!onUpdate) return;
+    setSavingMeta(true);
+    try {
+      await onUpdate(upload.id, {
+        game_date: gameDate || null,
+        opponent_played: opponentPlayed.trim() || null,
+      });
+    } finally {
+      setSavingMeta(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,11 +98,51 @@ export function ScreenshotDetailModal({
                 {warningCount} warning{warningCount === 1 ? "" : "s"}
               </Badge>
             )}
+            {needsGameTags && (
+              <Badge variant="secondary" className="text-xs">
+                Needs game date
+              </Badge>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">
             Uploaded {formatDate(upload.created_at)}
           </p>
+
+          {onUpdate && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+              <p className="text-xs font-medium">
+                Game tags (required for Pitching Ledger)
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Game date</Label>
+                  <Input
+                    type="date"
+                    value={gameDate}
+                    onChange={(e) => setGameDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Opponent played</Label>
+                  <Input
+                    value={opponentPlayed}
+                    onChange={(e) => setOpponentPlayed(e.target.value)}
+                    placeholder="e.g. BAM"
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={saveGameTags}
+                disabled={savingMeta || !gameDate}
+              >
+                <Save className="h-3 w-3 mr-1" />
+                {savingMeta ? "Saving..." : "Save game tags"}
+              </Button>
+            </div>
+          )}
 
           {upload.extraction_error && (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">

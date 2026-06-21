@@ -98,7 +98,12 @@ export function OpponentWorkspace({
         </TabsContent>
 
         <TabsContent value="pitching-ledger">
-          <PitchingLedgerTab data={data} onSwitchTab={setActiveTab} />
+          <PitchingLedgerTab
+            opponentId={opponentId}
+            data={data}
+            onSwitchTab={setActiveTab}
+            onRefresh={refresh}
+          />
         </TabsContent>
 
         <TabsContent value="report">

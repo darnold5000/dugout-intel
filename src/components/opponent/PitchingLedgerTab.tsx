@@ -13,14 +13,17 @@ import {
   resolveAvailabilityWindow,
 } from "@/lib/scouting/ledger-aggregate";
 import { resolveLedgerEntries } from "@/lib/scouting/resolve-ledger";
+import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
 import { formatPitchingRulesBlurb } from "@/lib/scouting/pitching-rules";
 import { formatDate, formatStat } from "@/lib/utils";
 import type { OpponentDetail, PitcherLedgerSummary } from "@/types";
 import { ChevronDown, ChevronUp, Info } from "lucide-react";
 
 interface PitchingLedgerTabProps {
+  opponentId: string;
   data: OpponentDetail;
   onSwitchTab?: (tab: string) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 function availabilityVariant(
@@ -174,8 +177,10 @@ function PitcherLedgerCard({ summary }: { summary: PitcherLedgerSummary }) {
 }
 
 export function PitchingLedgerTab({
+  opponentId,
   data,
   onSwitchTab,
+  onRefresh,
 }: PitchingLedgerTabProps) {
   const entries = useMemo(() => resolveLedgerEntries(data), [data]);
   const availabilityWindow = useMemo(() => resolveAvailabilityWindow(), []);
@@ -189,19 +194,59 @@ export function PitchingLedgerTab({
   );
 
   if (entries.length === 0) {
+    const pendingExtract = (data.screenshot_uploads ?? []).some(
+      (u) => u.extraction_status === "pending"
+    );
+    const missingDates = (data.screenshot_uploads ?? []).some(
+      (u) =>
+        u.extraction_status === "complete" &&
+        !u.game_date &&
+        (u.screenshot_type === "box_score" ||
+          u.screenshot_type === "pitching_stats")
+    );
+
     return (
       <div className="space-y-4">
         <Card>
-          <CardContent className="py-12 text-center space-y-3">
+          <CardContent className="py-12 text-center space-y-4">
             <p className="text-muted-foreground">
-              No tournament pitching ledger yet. Upload box scores with game dates
-              and opponent names in Scout Notes — each game builds a workload
-              entry per pitcher.
+              No pitching ledger entries yet. Each pitcher appearance needs a{" "}
+              <strong>game date on the screenshot</strong> (not just in a
+              separate context note) plus extracted pitching stats.
             </p>
+            <ul className="text-sm text-muted-foreground text-left max-w-md mx-auto space-y-1 list-disc pl-5">
+              <li>
+                Expand Add Context before upload — date + opponent tag the box
+                score automatically
+              </li>
+              <li>Or open a screenshot → Save game tags after upload</li>
+              <li>Run Extract Stats if the screenshot is still pending</li>
+              <li>
+                Or use pitcher # + innings in Add Context (no screenshot needed)
+              </li>
+            </ul>
+            {pendingExtract && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                You have screenshots waiting — run Extract Stats in Scout Notes.
+              </p>
+            )}
+            {missingDates && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                A box score was extracted but is missing a game date — tag it in
+                Screenshot Details.
+              </p>
+            )}
             {onSwitchTab && (
               <Button variant="outline" onClick={() => onSwitchTab("scout-notes")}>
                 Go to Scout Notes
               </Button>
+            )}
+            {onRefresh && (
+              <RebuildStatsButton
+                opponentId={opponentId}
+                onComplete={onRefresh}
+                label="Refresh Ledger"
+              />
             )}
           </CardContent>
         </Card>
@@ -229,6 +274,20 @@ export function PitchingLedgerTab({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          Ledger rebuilds automatically after extract, game tags, and pitcher
+          workload saves. Refresh if data looks stale.
+        </p>
+        {onRefresh && (
+          <RebuildStatsButton
+            opponentId={opponentId}
+            onComplete={onRefresh}
+            label="Refresh Ledger"
+            className="shrink-0"
+          />
+        )}
+      </div>
       <PitchingRulesBlurb />
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader className="pb-2">

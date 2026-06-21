@@ -48,6 +48,15 @@ export async function POST(
 
   const formData = await request.formData();
   const files = formData.getAll("files") as File[];
+  const gameDate = (formData.get("game_date") as string | null)?.trim() || null;
+  const opponentPlayed =
+    (formData.get("opponent_played") as string | null)?.trim() || null;
+  const tournamentName =
+    (formData.get("tournament_name") as string | null)?.trim() || null;
+  const gameType =
+    (formData.get("game_type") as string | null)?.trim() || "unknown";
+  const screenshotType =
+    (formData.get("screenshot_type") as string | null)?.trim() || null;
 
   if (files.length === 0) {
     return NextResponse.json({ error: "No files provided" }, { status: 400 });
@@ -90,6 +99,11 @@ export async function POST(
         file_url: publicUrl,
         file_path: filePath,
         extraction_status: "pending",
+        game_date: gameDate,
+        opponent_played: opponentPlayed,
+        tournament_name: tournamentName,
+        game_type: gameType,
+        screenshot_type: screenshotType,
       })
       .select()
       .single();
