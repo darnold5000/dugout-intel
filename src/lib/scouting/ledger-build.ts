@@ -1,5 +1,4 @@
 import { parsePlayerIdentity } from "@/lib/extraction/player-identity";
-import { gameMatchKey } from "@/lib/scouting/game-results";
 import type { LedgerEntryDraft } from "@/lib/scouting/ledger-types";
 import { extractPitchingFromRecap } from "@/lib/scouting/recap-pitching-extraction";
 import { enrichPitchingStatForDisplay } from "@/lib/scouting/pitching-derived";
@@ -15,24 +14,48 @@ import type {
 } from "@/types";
 import type { AIExtractionResult } from "@/types";
 
+function normalizeOpponent(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Identifies a single game appearance for ledger dedup/merge.
+ * Same date + opponent → one game (merge box score + context).
+ * Same date, no opponent → each upload is its own game (pool doubleheaders).
+ */
+function ledgerGameBucket(entry: {
+  game_date?: string | null;
+  opponent_played?: string | null;
+  source_reference?: string | null;
+}): string | null {
+  const date = entry.game_date?.slice(0, 10) ?? null;
+  if (!date) return null;
+
+  const opponent = normalizeOpponent(entry.opponent_played);
+  if (opponent) return `${date}|${opponent}`;
+  if (entry.source_reference) return `${date}|upload:${entry.source_reference}`;
+  return null;
+}
+
 function ledgerAppearanceKey(entry: {
   jersey_number?: string | null;
   player_name?: string | null;
   game_date?: string | null;
   opponent_played?: string | null;
+  source_reference?: string | null;
 }): string | null {
   const identity = parsePlayerIdentity(
     entry.player_name,
     entry.jersey_number ?? null
   );
-  const gameKey = gameMatchKey(entry.game_date, entry.opponent_played);
+  const gameBucket = ledgerGameBucket(entry);
   const playerKey =
     identity.jersey_number ??
     identity.merge_key ??
     identity.player_name?.toLowerCase() ??
     null;
-  if (!playerKey || !gameKey) return null;
-  return `${playerKey}|${gameKey}`;
+  if (!playerKey || !gameBucket) return null;
+  return `${playerKey}|${gameBucket}`;
 }
 
 function pickBetter<T>(a: T | null | undefined, b: T | null | undefined): T | null {
