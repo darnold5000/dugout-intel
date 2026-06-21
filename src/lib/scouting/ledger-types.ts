@@ -9,6 +9,7 @@ export interface LedgerEntryDraft {
   tournament_name: string | null;
   innings_pitched: number | null;
   pitch_count: number | null;
+  strikes: number | null;
   batters_faced: number | null;
   strikeouts: number | null;
   walks: number | null;

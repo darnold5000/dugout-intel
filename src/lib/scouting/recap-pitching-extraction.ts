@@ -112,6 +112,7 @@ export function extractPitchingFromRecap(
       tournament_name: ctx.tournament_name ?? null,
       innings_pitched: extractInningsPitched(sentence),
       pitch_count: extractPitchCount(sentence),
+      strikes: null,
       batters_faced: null,
       strikeouts: null,
       walks: null,

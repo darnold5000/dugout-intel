@@ -9,7 +9,7 @@ import {
   analyzePitchingStaffFromDetail,
 } from "@/lib/scouting/pitching-analysis";
 import { getConsolidatedPitchingStats } from "@/lib/scouting/player-profiles";
-import { formatPercent } from "@/lib/utils";
+import { formatPercent, formatPitchStrikes } from "@/lib/utils";
 import type { OpponentDetail } from "@/types";
 
 interface PitchingTabProps {
@@ -106,12 +106,18 @@ export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
                       {p.inningsPitchedDisplay && (
                         <span>{p.inningsPitchedDisplay} IP</span>
                       )}
-                      {p.pitches != null && <span>{p.pitches} pitches</span>}
-                      {p.strikes != null && p.balls != null && (
-                        <span>
-                          {p.strikes}S / {p.balls}B
-                        </span>
+                      {p.pitchStrikesLine ? (
+                        <span>{p.pitchStrikesLine} P-S</span>
+                      ) : (
+                        p.pitches != null && <span>{p.pitches} pitches</span>
                       )}
+                      {!p.pitchStrikesLine &&
+                        p.strikes != null &&
+                        p.balls != null && (
+                          <span>
+                            {p.strikes}S / {p.balls}B
+                          </span>
+                        )}
                       {p.strikePercentage != null && (
                         <span>{formatPercent(p.strikePercentage)} strikes</span>
                       )}

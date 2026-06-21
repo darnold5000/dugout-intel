@@ -1,5 +1,5 @@
 import { parseBaseballInnings, formatBaseballInnings } from "@/lib/scouting/innings";
-import { formatPercent, normalizePctDecimal } from "@/lib/utils";
+import { formatPercent, formatPitchStrikes, normalizePctDecimal } from "@/lib/utils";
 import {
   formatPlayerDisplayLabel,
   getConsolidatedPitchingStats,
@@ -42,6 +42,7 @@ export interface PitcherAnalysis {
   pitches: number | null;
   strikes: number | null;
   balls: number | null;
+  pitchStrikesLine: string | null;
   strikePercentage: number | null;
   walks: number | null;
   strikeouts: number | null;
@@ -352,6 +353,7 @@ export function analyzePitchingStaff(
         pitches,
         strikes,
         balls,
+        pitchStrikesLine: formatPitchStrikes(pitches, stat.strikes),
         strikePercentage: strikePct,
         walks: stat.walks,
         strikeouts: stat.strikeouts,
@@ -391,7 +393,10 @@ export function formatPitchingStaffRead(analyses: PitcherAnalysis[]): string {
         ...p.evidence.map((e) => `- ${e}`),
         "",
         "Pitch Profile:",
-        p.pitches != null ? `- ${p.pitches} pitches` : null,
+        p.pitchStrikesLine ? `- ${p.pitchStrikesLine} P-S` : null,
+        !p.pitchStrikesLine && p.pitches != null
+          ? `- ${p.pitches} pitches`
+          : null,
         p.strikes != null && p.balls != null
           ? `- ${p.strikes} strikes / ${p.balls} balls`
           : null,

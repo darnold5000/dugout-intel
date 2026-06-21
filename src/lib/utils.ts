@@ -45,3 +45,12 @@ export function normalizePctDecimal(value: number | null | undefined): number | 
   if (value > 1) return value / 100;
   return value;
 }
+
+/** Box score Pitches-Strikes line (e.g. 40 pitches, 30 strikes → "40-30"). */
+export function formatPitchStrikes(
+  pitches: number | null | undefined,
+  strikes: number | null | undefined
+): string | null {
+  if (pitches == null || strikes == null) return null;
+  return `${pitches}-${strikes}`;
+}

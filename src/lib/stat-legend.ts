@@ -21,7 +21,7 @@ export const PITCHING_STAT_TERMS: StatLegendTerm[] = [
   { abbr: "R", meaning: "Runs allowed" },
   { abbr: "ER", meaning: "Earned runs allowed" },
   { abbr: "P", meaning: "Total pitches" },
-  { abbr: "P-S", meaning: "Pitches–strikes" },
+  { abbr: "P-S", meaning: "Pitches–strikes (e.g. 40-30 = 40 pitches, 30 strikes)" },
   { abbr: "BF", meaning: "Batters faced (from box score or estimated from IP + H + BB)" },
   { abbr: "B", meaning: "Balls" },
   { abbr: "S%", meaning: "Strike percentage" },

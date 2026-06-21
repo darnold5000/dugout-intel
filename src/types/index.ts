@@ -219,6 +219,7 @@ export interface PitchingLedgerEntry {
   tournament_name: string | null;
   innings_pitched: number | null;
   pitch_count: number | null;
+  strikes: number | null;
   batters_faced: number | null;
   strikeouts: number | null;
   walks: number | null;
@@ -241,6 +242,7 @@ export interface PitcherLedgerSummary {
   label: string;
   totalInnings: number;
   totalPitches: number;
+  totalStrikes: number | null;
   gameCount: number;
   poolAppearances: number;
   bracketAppearances: number;

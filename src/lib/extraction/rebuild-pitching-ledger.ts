@@ -43,6 +43,7 @@ export async function rebuildPitchingLedger(
     tournament_name: draft.tournament_name,
     innings_pitched: draft.innings_pitched,
     pitch_count: draft.pitch_count,
+    strikes: draft.strikes,
     batters_faced: draft.batters_faced,
     strikeouts: draft.strikeouts,
     walks: draft.walks,

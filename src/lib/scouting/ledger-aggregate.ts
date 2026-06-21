@@ -161,6 +161,12 @@ function sumPitches(entries: PitchingLedgerEntry[]): number {
   return entries.reduce((sum, e) => sum + (e.pitch_count ?? 0), 0);
 }
 
+function sumStrikes(entries: PitchingLedgerEntry[]): number | null {
+  const withStrikes = entries.filter((e) => e.strikes != null);
+  if (!withStrikes.length) return null;
+  return withStrikes.reduce((sum, e) => sum + (e.strikes ?? 0), 0);
+}
+
 function inningsOnDate(entries: PitchingLedgerEntry[], date: string): number {
   return sumInnings(entries.filter((e) => e.game_date?.slice(0, 10) === date));
 }
@@ -367,6 +373,7 @@ export function buildPitcherSummaries(
     const first = sorted[0];
     const totalInnings = sumInnings(sorted);
     const totalPitches = sumPitches(sorted);
+    const totalStrikes = sumStrikes(sorted);
 
     const base = {
       playerKey,
@@ -375,6 +382,7 @@ export function buildPitcherSummaries(
       label: formatPitcherLabel(first),
       totalInnings,
       totalPitches,
+      totalStrikes,
       gameCount: sorted.length,
       poolAppearances: sorted.filter((a) => isPool(a.game_type)).length,
       bracketAppearances: sorted.filter((a) => isBracketGame(a.game_type)).length,

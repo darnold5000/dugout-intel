@@ -15,9 +15,11 @@ import {
 import { resolveLedgerEntries } from "@/lib/scouting/resolve-ledger";
 import { RebuildStatsButton } from "@/components/opponent/RebuildStatsButton";
 import { formatPitchingRulesBlurb } from "@/lib/scouting/pitching-rules";
-import { formatDate, formatStat } from "@/lib/utils";
+import { formatDate, formatPitchStrikes, formatStat } from "@/lib/utils";
 import type { OpponentDetail, PitcherLedgerSummary } from "@/types";
 import { ChevronDown, ChevronUp, Info } from "lucide-react";
+import { StatsLegend } from "@/components/StatsLegend";
+import { pickLegendTerms, PITCHING_STAT_TERMS } from "@/lib/stat-legend";
 
 interface PitchingLedgerTabProps {
   opponentId: string;
@@ -71,6 +73,10 @@ function PitchingRulesBlurb() {
 
 function PitcherLedgerCard({ summary }: { summary: PitcherLedgerSummary }) {
   const [open, setOpen] = useState(false);
+  const pitchStrikesTotal =
+    summary.totalStrikes != null
+      ? formatPitchStrikes(summary.totalPitches, summary.totalStrikes)
+      : null;
 
   return (
     <Card>
@@ -95,8 +101,12 @@ function PitcherLedgerCard({ summary }: { summary: PitcherLedgerSummary }) {
             <p className="font-semibold">{formatStat(summary.totalInnings, 1)}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Pitches</p>
-            <p className="font-semibold">{summary.totalPitches || "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              {pitchStrikesTotal ? "P-S" : "Pitches"}
+            </p>
+            <p className="font-semibold">
+              {pitchStrikesTotal ?? (summary.totalPitches || "—")}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Bracket</p>
@@ -159,7 +169,15 @@ function PitcherLedgerCard({ summary }: { summary: PitcherLedgerSummary }) {
                       ? `${formatStat(app.innings_pitched, 1)} IP`
                       : "— IP"}
                   </span>
-                  {app.pitch_count != null && <span>{app.pitch_count} pitches</span>}
+                  {formatPitchStrikes(app.pitch_count, app.strikes) ? (
+                    <span>
+                      {formatPitchStrikes(app.pitch_count, app.strikes)} P-S
+                    </span>
+                  ) : (
+                    app.pitch_count != null && (
+                      <span>{app.pitch_count} pitches</span>
+                    )
+                  )}
                   <WorkloadBar
                     innings={app.innings_pitched ?? 0}
                   />
@@ -191,6 +209,14 @@ export function PitchingLedgerTab({
   const outlook = useMemo(
     () => buildPitchingLedgerOutlook(summaries),
     [summaries]
+  );
+  const showPitchStrikes = summaries.some((s) => s.totalStrikes != null);
+  const ledgerLegend = useMemo(
+    () =>
+      showPitchStrikes
+        ? pickLegendTerms(PITCHING_STAT_TERMS, ["P-S"])
+        : [],
+    [showPitchStrikes]
   );
 
   if (entries.length === 0) {
@@ -340,7 +366,9 @@ export function PitchingLedgerTab({
             <tr className="border-b text-left text-muted-foreground">
               <th className="pb-2 pr-3 font-medium">Pitcher</th>
               <th className="pb-2 pr-3 font-medium">Total IP</th>
-              <th className="pb-2 pr-3 font-medium">Pitches</th>
+              <th className="pb-2 pr-3 font-medium">
+                {showPitchStrikes ? "P-S" : "Pitches"}
+              </th>
               <th className="pb-2 pr-3 font-medium">Games</th>
               <th className="pb-2 pr-3 font-medium">Bracket</th>
               <th className="pb-2 pr-3 font-medium">Remaining</th>
@@ -354,7 +382,14 @@ export function PitchingLedgerTab({
                 <td className="py-2 pr-3">
                   {formatStat(summary.totalInnings, 1)}
                 </td>
-                <td className="py-2 pr-3">{summary.totalPitches || "—"}</td>
+                <td className="py-2 pr-3">
+                  {summary.totalStrikes != null
+                    ? formatPitchStrikes(
+                        summary.totalPitches,
+                        summary.totalStrikes
+                      )
+                    : summary.totalPitches || "—"}
+                </td>
                 <td className="py-2 pr-3">{summary.gameCount}</td>
                 <td className="py-2 pr-3">{summary.bracketAppearances}</td>
                 <td className="py-2 pr-3">
@@ -382,6 +417,7 @@ export function PitchingLedgerTab({
           <PitcherLedgerCard key={summary.playerKey} summary={summary} />
         ))}
       </div>
+      {ledgerLegend.length > 0 && <StatsLegend terms={ledgerLegend} />}
     </div>
   );
 }
