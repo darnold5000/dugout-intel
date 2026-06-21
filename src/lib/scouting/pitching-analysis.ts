@@ -353,7 +353,7 @@ export function analyzePitchingStaff(
         pitches,
         strikes,
         balls,
-        pitchStrikesLine: formatPitchStrikes(pitches, stat.strikes),
+        pitchStrikesLine: formatPitchStrikes(pitches, strikes),
         strikePercentage: strikePct,
         walks: stat.walks,
         strikeouts: stat.strikeouts,

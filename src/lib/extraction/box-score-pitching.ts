@@ -28,31 +28,60 @@ function rowsMatchPitcher(
   if (pa.jersey_number && pb.jersey_number && pa.jersey_number === pb.jersey_number) {
     return true;
   }
-  const na = pa.player_name?.toLowerCase();
-  const nb = pb.player_name?.toLowerCase();
-  return !!na && !!nb && na === nb;
+  const na = pa.player_name?.toLowerCase().replace(/\./g, "").trim();
+  const nb = pb.player_name?.toLowerCase().replace(/\./g, "").trim();
+  if (na && nb && na === nb) return true;
+  if (na && nb) {
+    const partsA = na.split(/\s+/).filter(Boolean);
+    const partsB = nb.split(/\s+/).filter(Boolean);
+    const lastA = partsA[partsA.length - 1];
+    const lastB = partsB[partsB.length - 1];
+    if (
+      lastA &&
+      lastB &&
+      lastA === lastB &&
+      partsA[0]?.[0] &&
+      partsB[0]?.[0] &&
+      partsA[0][0] === partsB[0][0]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const PITCH_STRIKE_PAIR =
+  /(\d{1,3})\s*-\s*(\d{1,3})\s+((?:#\s*\d{1,3}\s+)?[A-Za-z][A-Za-z.'\s-]+?)(?=\s*(?:,|$|\d{1,3}\s*-\s*\d{1,3}))|((?:#\s*\d{1,3}\s+)?[A-Za-z][A-Za-z.'\s-]+?)\s+(\d{1,3})\s*-\s*(\d{1,3})(?=\s*(?:,|$|\d{1,3}\s*-\s*\d{1,3}))/gi;
+
+function pushPitchStrikesEntry(
+  entries: PitchStrikesEntry[],
+  pitches: number,
+  strikes: number,
+  rawName: string
+): void {
+  if (!rawName || isExcludedPlayerRow(rawName)) return;
+  const identity = parsePlayerIdentity(rawName, null);
+  if (!identity.player_name) return;
+  entries.push({
+    player_name: identity.player_name,
+    jersey_number: identity.jersey_number,
+    total_pitches: pitches,
+    strikes,
+  });
 }
 
 /** Parse "39-24 Waylon W" or "Waylon W 39-24" segments from footer text. */
 function parsePitchesStrikesSegments(text: string): PitchStrikesEntry[] {
   const entries: PitchStrikesEntry[] = [];
-  const segmentPattern =
-    /(?:(\d{1,3})-(\d{1,3})\s+([A-Za-z][A-Za-z.'\s-]+?)|([A-Za-z][A-Za-z.'\s-]+?)\s+(\d{1,3})-(\d{1,3}))(?=\s*(?:,|$|\d{1,3}-))/gi;
 
   let match: RegExpExecArray | null;
-  while ((match = segmentPattern.exec(text)) !== null) {
-    const pitches = Number(match[1] ?? match[5]);
-    const strikes = Number(match[2] ?? match[6]);
-    const rawName = (match[3] ?? match[4])?.trim();
-    if (!rawName || isExcludedPlayerRow(rawName)) continue;
-    const identity = parsePlayerIdentity(rawName, null);
-    if (!identity.player_name) continue;
-    entries.push({
-      player_name: identity.player_name,
-      jersey_number: identity.jersey_number,
-      total_pitches: pitches,
-      strikes,
-    });
+  PITCH_STRIKE_PAIR.lastIndex = 0;
+  while ((match = PITCH_STRIKE_PAIR.exec(text)) !== null) {
+    const pitches = Number(match[1] ?? match[6]);
+    const strikes = Number(match[2] ?? match[7]);
+    const rawName = (match[3] ?? match[5])?.trim();
+    if (!rawName) continue;
+    pushPitchStrikesEntry(entries, pitches, strikes, rawName);
   }
 
   if (entries.length > 0) return entries;
@@ -63,24 +92,29 @@ function parsePitchesStrikesSegments(text: string): PitchStrikesEntry[] {
     .trim();
   for (const part of cleaned.split(/,\s*/)) {
     const m = part.match(
-      /^(\d{1,3})-(\d{1,3})\s+(.+)$|^(.+?)\s+(\d{1,3})-(\d{1,3})$/
+      /^(\d{1,3})\s*-\s*(\d{1,3})\s+(.+)$|^(.+?)\s+(\d{1,3})\s*-\s*(\d{1,3})$/
     );
     if (!m) continue;
     const pitches = Number(m[1] ?? m[5]);
     const strikes = Number(m[2] ?? m[6]);
     const rawName = (m[3] ?? m[4])?.trim();
-    if (!rawName || isExcludedPlayerRow(rawName)) continue;
-    const identity = parsePlayerIdentity(rawName, null);
-    if (!identity.player_name) continue;
-    entries.push({
-      player_name: identity.player_name,
-      jersey_number: identity.jersey_number,
-      total_pitches: pitches,
-      strikes,
-    });
+    if (!rawName) continue;
+    pushPitchStrikesEntry(entries, pitches, strikes, rawName);
   }
 
   return entries;
+}
+
+function lineHasPitchStrikesPair(text: string): boolean {
+  return /\d{1,3}\s*-\s*\d{1,3}/.test(text);
+}
+
+function isPitchStrikesHeader(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    /pitches[\s-]*strikes/i.test(lower) ||
+    (lower.includes("pitches") && lower.includes("strike"))
+  );
 }
 
 /** Parse "10 Waylon W" segments from Batters Faced footer text. */
@@ -106,14 +140,26 @@ function parseBattersFacedSegments(text: string): BattersFacedEntry[] {
   return entries;
 }
 
-function collectTableText(table: RawExtractedTable): string[] {
+function collectFooterLines(table: RawExtractedTable): string[] {
   const lines: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    lines.push(trimmed);
+  };
+
   if (table.headers.length) {
-    lines.push(table.headers.join(" "));
+    add(table.headers.join(" "));
+    for (const cell of table.headers) add(cell);
   }
   for (const row of table.rows) {
-    const line = row.filter(Boolean).join(" ").trim();
-    if (line) lines.push(line);
+    add(row.filter(Boolean).join(" "));
+    for (const cell of row) {
+      if (cell?.trim()) add(cell);
+    }
   }
   return lines;
 }
@@ -128,16 +174,54 @@ export function parseBoxScorePitchingFooter(
   const battersFaced: BattersFacedEntry[] = [];
   if (!table) return { pitchesStrikes, battersFaced };
 
-  for (const line of collectTableText(table)) {
+  let inPitchStrikesSection = false;
+
+  for (const line of collectFooterLines(table)) {
     const lower = line.toLowerCase();
-    if (lower.includes("pitches") && lower.includes("strike")) {
-      pitchesStrikes.push(...parsePitchesStrikesSegments(line));
-    } else if (lower.includes("batters faced") || lower.startsWith("bf ")) {
+
+    if (isPitchStrikesHeader(line)) {
+      const inline = parsePitchesStrikesSegments(line);
+      if (inline.length) {
+        pitchesStrikes.push(...inline);
+        inPitchStrikesSection = false;
+      } else {
+        inPitchStrikesSection = true;
+      }
+      continue;
+    }
+
+    if (lower.includes("batters faced") || lower.startsWith("bf ")) {
+      inPitchStrikesSection = false;
       battersFaced.push(...parseBattersFacedSegments(line));
+      continue;
+    }
+
+    if (inPitchStrikesSection || lineHasPitchStrikesPair(line)) {
+      const parsed = parsePitchesStrikesSegments(line);
+      if (parsed.length) {
+        pitchesStrikes.push(...parsed);
+        if (!inPitchStrikesSection) continue;
+      }
+    }
+
+    if (inPitchStrikesSection && !lineHasPitchStrikesPair(line)) {
+      inPitchStrikesSection = false;
     }
   }
 
-  return { pitchesStrikes, battersFaced };
+  return {
+    pitchesStrikes: dedupePitchStrikes(pitchesStrikes),
+    battersFaced,
+  };
+}
+
+function dedupePitchStrikes(entries: PitchStrikesEntry[]): PitchStrikesEntry[] {
+  const seen = new Map<string, PitchStrikesEntry>();
+  for (const entry of entries) {
+    const key = `${entry.jersey_number ?? ""}|${entry.player_name?.toLowerCase() ?? ""}|${entry.total_pitches}|${entry.strikes}`;
+    seen.set(key, entry);
+  }
+  return Array.from(seen.values());
 }
 
 export function applyBoxScorePitchingSupplements(

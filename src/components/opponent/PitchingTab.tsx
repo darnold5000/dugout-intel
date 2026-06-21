@@ -69,92 +69,94 @@ export function PitchingTab({ data, onSwitchTab }: PitchingTabProps) {
             </Card>
           )}
 
-          <div className="space-y-4">
-            <h3 className="font-semibold text-sm">Pitching Staff</h3>
-            {analyses.map((p) => (
-              <Card key={`${p.jerseyNumber ?? "x"}-${p.playerName ?? p.label}`}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <CardTitle className="text-base">{p.label}</CardTitle>
-                    {p.roleLabels.map((role) => (
-                      <Badge key={role} variant="secondary" className="text-xs">
-                        {role}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 rounded-lg bg-muted/40 p-3">
-                    <ProfileRow label="Role" value={p.role} />
-                    <ProfileRow label="Workload" value={p.workload} />
-                    <ProfileRow
-                      label="Strike Thrower"
-                      value={p.strikeThrower ? "Yes" : "No"}
-                    />
-                    <ProfileRow label="Control Risk" value={p.controlRisk} />
-                    <ProfileRow
-                      label="Likely Usage"
-                      value={p.likelyUsage}
-                      />
-                  </div>
-
-                  <div>
-                    <p className="font-medium text-xs text-muted-foreground mb-1">
-                      Pitch Profile
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      {p.inningsPitchedDisplay && (
-                        <span>{p.inningsPitchedDisplay} IP</span>
-                      )}
-                      {p.pitchStrikesLine ? (
-                        <span>{p.pitchStrikesLine} P-S</span>
-                      ) : (
-                        p.pitches != null && <span>{p.pitches} pitches</span>
-                      )}
-                      {!p.pitchStrikesLine &&
-                        p.strikes != null &&
-                        p.balls != null && (
-                          <span>
-                            {p.strikes}S / {p.balls}B
-                          </span>
-                        )}
-                      {p.strikePercentage != null && (
-                        <span>{formatPercent(p.strikePercentage)} strikes</span>
-                      )}
-                      {p.era != null && <span>ERA {p.era.toFixed(2)}</span>}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+            <div className="lg:col-span-3 space-y-4 order-2 lg:order-1">
+              <h3 className="font-semibold text-sm">Pitching Staff</h3>
+              {analyses.map((p) => (
+                <Card key={`${p.jerseyNumber ?? "x"}-${p.playerName ?? p.label}`}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-base">{p.label}</CardTitle>
+                      {p.roleLabels.map((role) => (
+                        <Badge key={role} variant="secondary" className="text-xs">
+                          {role}
+                        </Badge>
+                      ))}
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 rounded-lg bg-muted/40 p-3">
+                      <ProfileRow label="Role" value={p.role} />
+                      <ProfileRow label="Workload" value={p.workload} />
+                      <ProfileRow
+                        label="Strike Thrower"
+                        value={p.strikeThrower ? "Yes" : "No"}
+                      />
+                      <ProfileRow label="Control Risk" value={p.controlRisk} />
+                      <ProfileRow
+                        label="Likely Usage"
+                        value={p.likelyUsage}
+                      />
+                    </div>
 
-                  {p.evidence.length > 0 && (
                     <div>
                       <p className="font-medium text-xs text-muted-foreground mb-1">
-                        Evidence Sources Used
+                        Pitch Profile
                       </p>
-                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
-                        {p.evidence.slice(0, 4).map((e, i) => (
-                          <li key={i}>{e}</li>
-                        ))}
-                      </ul>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        {p.inningsPitchedDisplay && (
+                          <span>{p.inningsPitchedDisplay} IP</span>
+                        )}
+                        {p.pitchStrikesLine ? (
+                          <span>{p.pitchStrikesLine} P-S</span>
+                        ) : (
+                          p.pitches != null && <span>{p.pitches} pitches</span>
+                        )}
+                        {!p.pitchStrikesLine &&
+                          p.strikes != null &&
+                          p.balls != null && (
+                            <span>
+                              {p.strikes}S / {p.balls}B
+                            </span>
+                          )}
+                        {p.strikePercentage != null && (
+                          <span>{formatPercent(p.strikePercentage)} strikes</span>
+                        )}
+                        {p.era != null && <span>ERA {p.era.toFixed(2)}</span>}
+                      </div>
                     </div>
-                  )}
 
-                  <p className="text-sm">
-                    <span className="font-medium">How To Attack: </span>
-                    {p.coachTakeaway}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+                    {p.evidence.length > 0 && (
+                      <div>
+                        <p className="font-medium text-xs text-muted-foreground mb-1">
+                          Evidence Sources Used
+                        </p>
+                        <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
+                          {p.evidence.slice(0, 4).map((e, i) => (
+                            <li key={i}>{e}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <p className="text-sm">
+                      <span className="font-medium">How To Attack: </span>
+                      {p.coachTakeaway}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="lg:col-span-2 order-1 lg:order-2">
+              <CardHeader>
+                <CardTitle className="text-base">Pitching Stats</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PitchingStatsTable stats={consolidatedStats} />
+              </CardContent>
+            </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Pitching Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PitchingStatsTable stats={consolidatedStats} />
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
