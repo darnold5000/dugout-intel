@@ -5,9 +5,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Parse YYYY-MM-DD as local calendar date (avoids UTC off-by-one in US timezones). */
+export function parseCalendarDate(date: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date.trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  if (!year || month < 0 || month > 11 || !day) return null;
+  return new Date(year, month, day);
+}
+
 export function formatDate(date: string | null): string {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  const local = parseCalendarDate(date);
+  const d = local ?? new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

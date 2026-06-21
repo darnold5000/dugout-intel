@@ -252,6 +252,48 @@ export function buildEvidenceLibrary(data: OpponentDetail): EvidenceLibraryItem[
   return items.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+export interface EvidenceTimelineSummary {
+  kind: EvidenceKind;
+  label: string;
+  count: number;
+  importance: number;
+}
+
+/** Collapse duplicate timeline rows (e.g. 10 box scores → one chip). */
+export function summarizeTimelineItems(
+  items: EvidenceLibraryItem[]
+): EvidenceTimelineSummary[] {
+  const buckets = new Map<string, EvidenceTimelineSummary>();
+
+  for (const item of items) {
+    const bucketKey = `${item.kind}|${item.title}`;
+    const existing = buckets.get(bucketKey);
+    if (existing) {
+      existing.count += 1;
+      existing.importance = Math.max(existing.importance, item.importance);
+    } else {
+      buckets.set(bucketKey, {
+        kind: item.kind,
+        label: item.title,
+        count: 1,
+        importance: item.importance,
+      });
+    }
+  }
+
+  const kindOrder: EvidenceKind[] = [
+    "screenshot",
+    "game_context",
+    "note",
+    "voice",
+    "document",
+  ];
+
+  return Array.from(buckets.values()).sort(
+    (a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind)
+  );
+}
+
 export function buildEvidenceTimeline(
   data: OpponentDetail
 ): EvidenceTimelineGroup[] {

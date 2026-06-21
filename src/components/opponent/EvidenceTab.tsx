@@ -24,6 +24,7 @@ import {
   buildEvidenceLibrary,
   buildEvidenceTimeline,
   importanceStars,
+  summarizeTimelineItems,
   type EvidenceKind,
   type EvidenceLibraryItem,
 } from "@/lib/scouting/evidence-timeline";
@@ -606,7 +607,7 @@ export function ScoutNotesTab({
       return (
         <Card key={item.id} className="overflow-hidden">
           <div
-            className="relative w-full aspect-[3/4] bg-muted cursor-pointer"
+            className="relative w-full h-28 sm:h-32 bg-muted cursor-pointer"
             onClick={() => setDetailUpload(upload)}
           >
             <Image
@@ -617,24 +618,27 @@ export function ScoutNotesTab({
               sizes="(max-width: 768px) 100vw, 50vw"
             />
           </div>
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-2.5 space-y-2">
             <div>
-              <p className="font-medium text-sm">{item.title}</p>
-              <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+              <p className="font-medium text-xs leading-tight">{item.title}</p>
+              <p className="text-[11px] text-muted-foreground line-clamp-1">
+                {item.subtitle}
+              </p>
             </div>
             <ExtractionStatusBadge status={upload.extraction_status} />
             <IncludedToggle
               included={item.includedInReport}
               onChange={(v) => toggleIncluded(item, v)}
             />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               <Button
                 variant="outline"
                 size="sm"
+                className="h-7 text-xs px-2"
                 onClick={() => setDetailUpload(upload)}
               >
                 <Maximize2 className="h-3 w-3 mr-1" />
-                Expand
+                View
               </Button>
               <select
                 value={upload.screenshot_type ?? "unknown"}
@@ -643,7 +647,7 @@ export function ScoutNotesTab({
                     screenshot_type: e.target.value as ScreenshotType,
                   })
                 }
-                className="text-xs rounded border px-2 py-1.5 h-8"
+                className="text-[11px] rounded border px-1.5 py-1 h-7 max-w-[7rem]"
               >
                 {Object.entries(SCREENSHOT_TYPE_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>
@@ -667,19 +671,21 @@ export function ScoutNotesTab({
 
     return (
       <Card key={item.id} className="h-full">
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-2.5 space-y-2">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-lg leading-none mb-1">{KIND_ICONS[item.kind]}</p>
-              <p className="font-medium text-sm">{item.title}</p>
-              <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+            <div className="min-w-0">
+              <p className="text-sm leading-none mb-0.5">{KIND_ICONS[item.kind]}</p>
+              <p className="font-medium text-xs">{item.title}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {item.subtitle}
+              </p>
             </div>
-            <Badge variant="secondary" className="text-xs shrink-0">
+            <Badge variant="secondary" className="text-[10px] shrink-0">
               {KIND_LABELS[item.kind]}
             </Badge>
           </div>
           {item.preview && (
-            <p className="text-sm text-muted-foreground line-clamp-6 whitespace-pre-wrap">
+            <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
               {item.preview}
             </p>
           )}
@@ -1168,34 +1174,41 @@ export function ScoutNotesTab({
 
       {timeline.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold mb-4">Scout Notes Timeline</h2>
-          <div className="space-y-6">
-            {timeline.map((group) => (
-              <div key={group.key} className="relative pl-4 border-l-2 border-muted">
-                <div className="mb-2">
-                  <p className="font-medium text-sm">{group.heading}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {group.subtitle}
-                    {group.scoreLine ? ` · ${group.scoreLine}` : ""}
-                  </p>
+          <h2 className="text-sm font-semibold mb-3">Scout Notes Timeline</h2>
+          <div className="space-y-2">
+            {timeline.map((group) => {
+              const summaries = summarizeTimelineItems(group.items);
+              return (
+                <div
+                  key={group.key}
+                  className="rounded-md border bg-card px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm leading-tight">
+                      {group.heading}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {group.subtitle}
+                      {group.scoreLine ? ` · ${group.scoreLine}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 shrink-0">
+                    {summaries.map((summary) => (
+                      <Badge
+                        key={`${summary.kind}-${summary.label}`}
+                        variant="secondary"
+                        className="text-[11px] font-normal gap-1"
+                      >
+                        <span>{KIND_ICONS[summary.kind]}</span>
+                        {summary.count > 1
+                          ? `${summary.count}× ${summary.label}`
+                          : summary.label}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {group.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-2 text-sm"
-                    >
-                      <span>
-                        {KIND_ICONS[item.kind]} {item.title}
-                      </span>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {importanceStars(item.importance)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -1204,7 +1217,7 @@ export function ScoutNotesTab({
         <section>
           <h2 className="text-sm font-semibold mb-3">Screenshot Review</h2>
           <Card className="overflow-hidden">
-            <div className="relative w-full aspect-[3/4] max-h-[70vh] bg-muted">
+            <div className="relative w-full h-48 sm:h-56 bg-muted">
               {(() => {
                 const idx = galleryIndex ?? 0;
                 const item = screenshotItems[idx];
@@ -1293,7 +1306,7 @@ export function ScoutNotesTab({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {library.map(renderLibraryCard)}
           </div>
         )}
