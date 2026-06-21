@@ -64,6 +64,12 @@ export async function POST(
     return NextResponse.json({ error: "Opponent not found" }, { status: 404 });
   }
 
+  const { data: opponent } = await supabase
+    .from("opponents")
+    .select("name")
+    .eq("id", opponentId)
+    .single();
+
   const body = await request.json();
   if (!body.note_text?.trim()) {
     return NextResponse.json({ error: "note_text is required" }, { status: 400 });
@@ -80,6 +86,7 @@ export async function POST(
       game_date: body.game_date || null,
       opponent_played: body.opponent_played || null,
       game_type: body.game_type ?? "unknown",
+      opponent_name: opponent?.name ?? null,
       included_in_report: body.included_in_report ?? true,
     })
     .select()

@@ -108,6 +108,7 @@ interface EvidenceTabProps {
   opponentName: string;
   data: OpponentDetail;
   onRefresh: () => Promise<void>;
+  onUploadsAdded?: (uploads: OpponentDetail["screenshot_uploads"]) => void;
 }
 
 function IncludedToggle({
@@ -137,6 +138,7 @@ export function ScoutNotesTab({
   opponentName,
   data,
   onRefresh,
+  onUploadsAdded,
 }: EvidenceTabProps) {
   const [composerText, setComposerText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -290,8 +292,10 @@ export function ScoutNotesTab({
       const d = await res.json();
       throw new Error(d.error || "Upload failed");
     }
+    const uploaded = (await res.json()) as OpponentDetail["screenshot_uploads"];
+    onUploadsAdded?.(uploaded);
     await onRefresh();
-    await runExtraction();
+    void runExtraction();
   };
 
   const uploadDocument = async (file: File) => {

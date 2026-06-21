@@ -34,6 +34,7 @@ export async function rebuildPitchingLedger(
   const rows = drafts.map((draft) => ({
     opponent_id: opponentId,
     user_id: userId,
+    opponent_name: data.name || null,
     player_name: draft.player_name,
     jersey_number: draft.jersey_number,
     game_date: draft.game_date,

@@ -43,11 +43,24 @@ export function OpponentWorkspace({
     const authHeaders = await getAuthHeaders();
     const res = await fetch(`/api/opponents/${opponentId}`, {
       headers: authHeaders,
+      cache: "no-store",
     });
     if (res.ok) {
       setData(await res.json());
     }
   }, [opponentId]);
+
+  const mergeUploads = useCallback((newUploads: OpponentDetail["screenshot_uploads"]) => {
+    if (!newUploads?.length) return;
+    setData((prev) => {
+      const existing = prev.screenshot_uploads ?? [];
+      const merged = [
+        ...newUploads,
+        ...existing.filter((u) => !newUploads.some((n) => n.id === u.id)),
+      ];
+      return { ...prev, screenshot_uploads: merged };
+    });
+  }, []);
 
   const notesTotal = useMemo(() => scoutNotesCount(data), [data]);
 
@@ -90,6 +103,7 @@ export function OpponentWorkspace({
             opponentName={data.name}
             data={data}
             onRefresh={refresh}
+            onUploadsAdded={mergeUploads}
           />
         </TabsContent>
 

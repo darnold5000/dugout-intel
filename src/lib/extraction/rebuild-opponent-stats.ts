@@ -244,6 +244,12 @@ export async function rebuildOpponentStats(
   const battingCount = consolidated.batting_stats.length;
 
   if (options.userId) {
+    const { data: opponentRow } = await supabase
+      .from("opponents")
+      .select("name")
+      .eq("id", opponentId)
+      .single();
+
     const [
       { data: opponent_notes },
       { data: opponent_voice_notes },
@@ -260,7 +266,7 @@ export async function rebuildOpponentStats(
       id: opponentId,
       user_id: options.userId,
       team_id: null,
-      name: "",
+      name: opponentRow?.name ?? "",
       age_level: "",
       location: null,
       notes: null,

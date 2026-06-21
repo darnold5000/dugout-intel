@@ -20,7 +20,7 @@ export async function POST(
 
   const { data: opponent } = await supabase
     .from("opponents")
-    .select("id")
+    .select("id, name")
     .eq("id", opponentId)
     .eq("user_id", user.id)
     .single();
@@ -88,6 +88,7 @@ export async function POST(
       game_type: gameType,
       game_date: gameDate,
       opponent_played: opponentPlayed,
+      opponent_name: opponent.name,
       included_in_report: true,
     })
     .select()

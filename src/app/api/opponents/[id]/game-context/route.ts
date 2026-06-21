@@ -17,7 +17,7 @@ export async function POST(
 
   const { data: opponent } = await supabase
     .from("opponents")
-    .select("id")
+    .select("id, name")
     .eq("id", opponentId)
     .eq("user_id", user.id)
     .single();
@@ -68,6 +68,7 @@ export async function POST(
       innings_pitched: parseInnings(body.innings_pitched),
       pitch_count: parsePitchCount(body.pitch_count),
       pitcher_role: body.pitcher_role ?? "unknown",
+      opponent_name: opponent.name,
       included_in_report: body.included_in_report ?? true,
     })
     .select()

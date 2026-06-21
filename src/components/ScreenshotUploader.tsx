@@ -80,7 +80,10 @@ export function ScreenshotUploader({
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            onChange={(e) => {
+              if (e.target.files) handleFiles(e.target.files);
+              e.target.value = "";
+            }}
             disabled={disabled}
           />
           <Button variant="outline" size="sm" asChild>

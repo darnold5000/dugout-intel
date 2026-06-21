@@ -101,6 +101,7 @@ export interface ScreenshotUpload {
   raw_extracted_table: RawExtractedTable | null;
   extraction_warnings: string[] | null;
   included_in_report?: boolean;
+  opponent_name?: string | null;
   game_date?: string | null;
   opponent_played?: string | null;
   tournament_name?: string | null;
@@ -112,6 +113,7 @@ export interface OpponentNote {
   id: string;
   opponent_id: string;
   user_id: string;
+  opponent_name?: string | null;
   note_text: string;
   note_type: NoteType | string;
   importance: Importance | string;
@@ -139,6 +141,7 @@ export interface OpponentVoiceNote {
   id: string;
   opponent_id: string;
   user_id: string;
+  opponent_name?: string | null;
   audio_file_path: string | null;
   transcript_text: string | null;
   note_type: NoteType | string;
@@ -159,6 +162,7 @@ export interface OpponentGameContext {
   id: string;
   opponent_id: string;
   user_id: string;
+  opponent_name?: string | null;
   game_date: string | null;
   opponent_played: string | null;
   tournament_name: string | null;
@@ -206,6 +210,7 @@ export interface PitchingLedgerEntry {
   id: string;
   opponent_id: string;
   user_id: string;
+  opponent_name?: string | null;
   player_name: string | null;
   jersey_number: string | null;
   game_date: string | null;
